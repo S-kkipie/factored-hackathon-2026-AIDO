@@ -1,0 +1,10 @@
+.venv/
+data/
+.env
+*.pyc
+__pycache__/
+
+# Organizer materials stay local (the data dictionary contains AWS credentials)
+docs/*
+!docs/data_findings.md
+!docs/superpowers/
