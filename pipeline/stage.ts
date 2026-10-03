@@ -50,7 +50,7 @@ function tableDdl(contract: Contract): string {
  * - A file is (re)loaded when its path (relative to rawDir) is new or its size changed.
  * - Rows violating the contract go to stg._rejects with their reasons.
  * - Within a batch, the row from the lexically latest file wins (partition paths are zero-padded dates).
- * - Across batches, the most recently loaded row wins (insert or replace on the primary key).
+ * - Across batches, the row from the lexically latest source file wins; re-loading the same file replaces its rows.
  */
 export async function stageTable(
   duck: Duck,
@@ -103,17 +103,31 @@ export async function stageTable(
     select * exclude (_reasons) from _typed where _reasons = ''
     qualify row_number() over (partition by ${pk} order by source_file desc) = 1`);
 
-  const counts = await duck.one<{ rows_read: number; rejected: number; valid: number; clean: number; updated: number }>(
+  const counts = await duck.one<{
+    rows_read: number;
+    rejected: number;
+    valid: number;
+    clean: number;
+    stale: number;
+    updated_count: number;
+    same_source: number;
+  }>(
     `select
       (select count(*)::integer from _typed) as rows_read,
       (select count(*)::integer from _typed where _reasons <> '') as rejected,
       (select count(*)::integer from _typed where _reasons = '') as valid,
       (select count(*)::integer from _clean) as clean,
-      (select count(*)::integer from _clean n where exists (select 1 from ${table} s where s.${pk} = n.${pk})) as updated`,
+      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file < s.source_file)) as stale,
+      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file > s.source_file)) as updated_count,
+      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file = s.source_file)) as same_source`,
   );
 
   const columns = [...contract.columns.map((c) => ident(c.name)), "source_file"].join(", ");
-  await duck.run(`insert or replace into ${table} (${columns}, load_id) select ${columns}, ${lit(loadId)} from _clean`);
+  const updateCols = contract.columns.map((c) => `${ident(c.name)} = excluded.${ident(c.name)}`).join(", ");
+  await duck.run(`insert into ${table} (${columns}, load_id)
+    select ${columns}, ${lit(loadId)} from _clean
+    where not exists (select 1 from ${table} s where s.${pk} = _clean.${pk} and s.source_file >= _clean.source_file)
+    on conflict (${pk}) do update set ${updateCols}, source_file = excluded.source_file, load_id = excluded.load_id`);
   const fileRows = pending
     .map((f) => `(${lit(contract.table)}, ${lit(relative(rawDir, f.path))}, ${f.size}, ${lit(loadId)})`)
     .join(", ");
@@ -122,7 +136,7 @@ export async function stageTable(
   result.rowsRead = counts.rows_read;
   result.rejected = counts.rejected;
   result.duplicatesInBatch = counts.valid - counts.clean;
-  result.updated = counts.updated;
-  result.inserted = counts.clean - counts.updated;
+  result.updated = counts.updated_count;
+  result.inserted = counts.clean - counts.updated_count - counts.stale - counts.same_source;
   return result;
 }

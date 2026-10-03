@@ -90,6 +90,52 @@ describe("stageTable", () => {
     duck.close();
   });
 
+  test("respects partition recency: newer partition data is not overwritten by older files", async () => {
+    const config = await makeWorkspace();
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+
+    // Initial load: T1 comes from day=11 with status Reversed (newer) and day=10 with status Approved (older)
+    await stageTable(duck, transactions, await listSourceFiles(config.rawDir, transactions.files), config.rawDir, "load-1");
+    const t1After = await duck.one<Record<string, unknown>>(
+      "select transaction_status, source_file from stg.transactions where transaction_id = 'T1'",
+    );
+    expect(t1After.transaction_status).toBe("Reversed");
+    expect(t1After.source_file).toContain("day=11");
+
+    // Rewrite day=10 file with T8 added (change size so it's re-loaded)
+    await Bun.write(
+      join(config.rawDir, "transactions/year=2026/month=06/day=10/transactions_20260610.csv"),
+      `${TX_HEADER}\nT1,2026-06-10 12:00:00,2026-06-10,P1,C1,Purchase,Food,45.00,USD,,POS,Super Ahorro,Food,Mexico,CDMX,Approved,00,False,12.5\nT2,2026-06-10 13:00:00,2026-06-10,P1,C1,Purchase,Other,300.00,USD,,Web,Boutique Moda,Other,México,CDMX,Approved,00,False,88.0\nT3,2026-06-10 14:00:00,2026-06-10,P3,C3,Purchase,Entertainment,900000,ARS,950.00,POS,Teatro Nacional,Entertainment,Argentina,Buenos Aires,Approved,00,False,5.0\nT4,2026-06-10 15:00:00,2026-06-10,P2,C2,Withdrawal,,200000,COP,48.00,ATM,,,Colombia,Bogotá,Approved,00,False,3.0\nTX,not-a-date,2026-06-10,P1,C1,Purchase,Food,10,USD,,POS,Super Ahorro,Food,México,CDMX,Approved,00,False,1.0\nT8,2026-06-10 16:00:00,2026-06-10,P1,C1,Purchase,Food,50.00,USD,,POS,Mercado Local,Food,México,CDMX,Approved,00,False,6.0\n`,
+    );
+
+    // Re-load: should pick up T8 as new, but NOT overwrite T1 with day=10's status
+    const rerun = await stageTable(
+      duck,
+      transactions,
+      await listSourceFiles(config.rawDir, transactions.files),
+      config.rawDir,
+      "load-2",
+    );
+    expect(rerun).toMatchObject({ filesLoaded: 1, inserted: 1, updated: 0 });
+
+    // Verify T1 still has status from day=11
+    const t1Final = await duck.one<Record<string, unknown>>(
+      "select transaction_status, source_file from stg.transactions where transaction_id = 'T1'",
+    );
+    expect(t1Final.transaction_status).toBe("Reversed");
+    expect(t1Final.source_file).toContain("day=11");
+
+    // Verify T8 was inserted
+    const t8 = await duck.one<Record<string, unknown>>(
+      "select transaction_id, source_file from stg.transactions where transaction_id = 'T8'",
+    );
+    expect(t8.transaction_id).toBe("T8");
+    expect(t8.source_file).toContain("day=10");
+
+    duck.close();
+  });
+
   test("reports schema drift", async () => {
     const config = await makeWorkspace();
     await Bun.write(
