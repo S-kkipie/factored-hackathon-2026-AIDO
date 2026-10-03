@@ -6,7 +6,7 @@ A customer-service system for a LATAM bank that answers account and transaction 
 
 > **Principle:** the model understands and writes; deterministic code decides and acts.
 
-**Status:** design complete, implementation in progress (see [Roadmap](#roadmap)). No results are reported yet: every number below comes from the data audit, not from the system.
+**Status:** core service implemented on Postgres/Supabase; UI, router comparison and evaluation in progress (see [Roadmap](#roadmap)). No results are reported yet: every number below comes from the data audit, not from the system.
 
 ---
 
@@ -94,11 +94,12 @@ The baseline and the proposed system replay the same frozen held-out workload: a
 | Layer | Choice |
 |---|---|
 | Runtime / API | [Bun](https://bun.sh) + [Elysia](https://elysiajs.com), TypeScript end to end |
-| Orchestration | [LangGraph JS](https://langchain-ai.github.io/langgraphjs/) with custom nodes, interrupts and a SQLite checkpointer |
+| Orchestration | [LangGraph JS](https://langchain-ai.github.io/langgraphjs/) with custom nodes, interrupts and a Postgres checkpointer |
 | Models | Gemini Flash (extraction and replies), intent router: Jev vs. own embeddings + logistic regression vs. baselines |
 | Agent ↔ UI | [AG-UI](https://docs.ag-ui.com) protocol over SSE |
 | Frontend | React + Vite + TanStack Router |
-| Data | DuckDB pipeline with data contracts → `serving.sqlite` |
+| Data | DuckDB pipeline with data contracts → `serving.sqlite` → Postgres `serving` schema |
+| Database | [Supabase](https://supabase.com) Postgres (`serving` + `ops` schemas, RLS, not exposed via the Data API); [PGlite](https://pglite.dev) in tests and local dev |
 | Observability | OpenTelemetry GenAI conventions → Langfuse; hash-chained audit log |
 | Deploy | Google Cloud Run (single container) |
 
@@ -106,7 +107,8 @@ The baseline and the proposed system replay the same frozen held-out workload: a
 
 ```
 pipeline/   data contracts, incremental staging, curation, quality report (Bun + DuckDB)
-server/     auth, tools, policy engine, gates, LangGraph graph, API (in progress)
+server/     auth, tools, policy engine, gates, LangGraph graph, API
+supabase/   Postgres migrations (single source of the schema) and CLI config
 tests/      unit and end-to-end tests (bun test)
 reports/    generated data-quality, demand and evaluation reports
 docs/
@@ -123,11 +125,29 @@ Requires Bun 1.3+.
 
 ```bash
 bun install
-cp .env.example .env   # organizer S3 credentials: never commit .env
+cp .env.example .env   # never commit .env
+bun test               # runs against in-process Postgres (PGlite); no services needed
+```
+
+**Data.** Pick one:
+
+```bash
+# A) Without the organizer dataset: synthetic demo data with the five demo personas
+bun run seed:demo
+
+# B) With the organizer S3 credentials in .env
 bun run download       # mirror the dataset into data/raw (idempotent)
 bun run pipeline       # contracts → staging → serving.sqlite, marts, reports
-bun test
+bun run publish        # serving.sqlite → Postgres serving schema
 ```
+
+**Database.** With `DATABASE_URL` empty, the server and scripts use a local PGlite database in `data/pglite`. To use Supabase:
+
+1. Create a project (CLI: `supabase projects create aido --region sa-east-1`), then `supabase link --project-ref <ref>`.
+2. `bun run db:push` applies `supabase/migrations` (the server also applies them at startup; they are idempotent).
+3. Set `DATABASE_URL` to the **session pooler** connection string (Project Settings → Database → Connection string). The transaction pooler (port 6543) also works.
+
+Both schemas have row level security enabled with no policies and no grants for `anon`/`authenticated`: bank data is reachable only through the server's own Postgres role, never through the Supabase Data API.
 
 The dataset and the derived `serving.sqlite` are distributed to participants only. They are never committed to this public repository.
 
@@ -137,7 +157,7 @@ The dataset and the derived `serving.sqlite` are distributed to participants onl
 export JWT_SECRET=$(openssl rand -hex 32)   # required, ≥ 32 chars
 export GEMINI_API_KEY=...                    # optional; without it the assistant uses templates and escalates
 bun run dev                                  # http://localhost:8080
-bun run smoke                                # scripted ES/PT turns over data/serving.sqlite
+bun run smoke                                # scripted ES/PT turns over the configured database
 ```
 
 | Route | Purpose |
@@ -153,25 +173,26 @@ bun run smoke                                # scripted ES/PT turns over data/se
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
 
-Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`.
+Optional env: `DATABASE_URL`, `PGLITE_DIR`, `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH` (for `publish`).
 
-**Limits:** the per-session lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are in-process state — run a single instance (e.g. Cloud Run `--max-instances=1`); that state (and the SQLite-backed sessions, checkpoints and queue) is lost on restart. The production path is Postgres/Redis for this state (see [Known limitations](#known-limitations)). `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
+**Limits:** sessions, checkpoints, disputes, the handoff queue, audit log and spans live in Postgres and survive restarts. Single-use nonces and the audit hash chain are safe across instances (atomic update, advisory lock). The per-session turn lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are still in-process, so run a single instance or session-sticky routing until they move to Postgres advisory locks / Redis. `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
 
 Pipeline outputs:
-- `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
+- `data/serving.sqlite`: customer subset and demo personas, published to Postgres with `bun run publish` (not committed).
 - `data/marts/*.parquet`: demand evidence.
 - `reports/quality.md`, `reports/demand.md`: data quality and demand reports (committed).
 - `data/runs/<run_id>/manifest.json`: lineage (input fingerprints, per-stage counts, output hash).
 
-`serving.sqlite` contract (read by the server): tables `customers`, `products` (`product_number_masked`), `transactions` (ISO `transaction_date`, `amount_usd` derived for USD rows and null for ~2% of ARS/COP rows, no `is_fraud`), `complaints` (`is_repeat_complainer` 0/1), `demo_users`, `meta` (`clock`, `window_days`, `built_at`).
+Serving contract (`serving.sqlite` and the Postgres `serving` schema read by the server): tables `customers`, `products` (`product_number_masked`), `transactions` (ISO `transaction_date`, `amount_usd` derived for USD rows and null for ~2% of ARS/COP rows, no `is_fraud`), `complaints` (`is_repeat_complainer` 0/1), `demo_users`, `meta` (`clock`, `window_days`, `built_at`).
 
 ## Roadmap
 
 | Plan | Scope | Status |
 |---|---|---|
-| 1 | Foundation and data pipeline | in progress |
-| 2a | Core domain: auth, tools, policy, gates | planned |
-| 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | planned |
+| 1 | Foundation and data pipeline | done |
+| 2a | Core domain: auth, tools, policy, gates | done |
+| 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
+| 2c | Postgres / Supabase for runtime state and serving data | done |
 | 3 | Intent router: dataset, four-way comparison, calibration | planned |
 | 4 | Web UI: chat, agent console, trace viewer | planned |
 | 5 | Evaluation harness and red teaming | planned |
@@ -182,7 +203,7 @@ Pipeline outputs:
 - The data is synthetic. Text fields are templated, so supervised NLP on the provided transcripts is not meaningful.
 - There is no Portuguese source data. Portuguese coverage comes from team-generated, labeled examples.
 - Evaluation samples are small. Zero observed failures does not mean zero risk.
-- Writable state lives in container-local SQLite, so the service runs as a single Cloud Run instance. The production path is Postgres / Cloud SQL.
+- Writable state is in Postgres (Supabase), but the per-session turn lock and the circuit breaker are in-process, so the service still runs as a single instance.
 
 ## Documentation
 
