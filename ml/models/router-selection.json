@@ -1,0 +1,6 @@
+{
+  "router": "embed-lr",
+  "runId": "router-2026-10-03T23-40-44-492Z",
+  "rationale": "embed-lr has test macro-F1 0.975 and out_of_scope safe rate 1.000; it meets the 0.8 out_of_scope safe rate floor; gemini-zeroshot scored macro-F1 1.000 but is not deployable within the 3-calls-per-turn budget",
+  "threshold": 0
+}

@@ -159,6 +159,8 @@ Optional env: `ROUTER` (`auto` default, `keyword`, `embed-lr`), `GEMINI_MODEL` (
 
 ### Train the intent router
 
+Latest run (`reports/router.md`): keyword baseline macro-F1 0.631, embeddings + logistic regression 0.975 (selected; deployed threshold 0.60), Gemini zero-shot 1.000 (not deployable: it would add a fourth model call per turn). Both trained/zero-shot scores are near ceiling on a clean, hand-written test set written by the same author as the seeds (113 near-duplicate training rows were dropped); expect lower accuracy on real traffic, which plan 5 measures end to end. Total cost of data generation and training: about USD 0.19.
+
 ```bash
 bun run ml:generate   # seeds + Gemini paraphrases → ml/data/router-train.jsonl (~$0.15)
 bun run train         # keyword vs Gemini zero-shot vs embeddings + logistic regression → reports/router.md (~$0.15–0.45; zero-shot dominates; capped by ML_RUN_LIMIT_USD)
@@ -183,7 +185,7 @@ Pipeline outputs:
 | 1 | Foundation and data pipeline | done |
 | 2a | Core domain: auth, tools, policy, gates | done |
 | 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
-| 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | in progress |
+| 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
 | 4 | Web UI: chat, agent console, trace viewer | planned |
 | 5 | Evaluation harness and red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |
