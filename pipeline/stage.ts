@@ -35,10 +35,13 @@ export async function ensureStagingSchema(duck: Duck): Promise<void> {
       missing_columns varchar, unexpected_columns varchar, loaded_at timestamp);`);
 }
 
+/** Forward-slash path, so stored source_file values and DuckDB filenames match on Windows too. */
+const posix = (p: string): string => p.replaceAll("\\", "/");
+
 export async function listSourceFiles(rawDir: string, pattern: string): Promise<SourceFile[]> {
   const files: SourceFile[] = [];
   for await (const rel of new Bun.Glob(pattern).scan({ cwd: rawDir })) {
-    const path = join(rawDir, rel);
+    const path = posix(join(rawDir, rel));
     files.push({ path, size: Bun.file(path).size });
   }
   return files.sort((a, b) => a.path.localeCompare(b.path));
@@ -64,6 +67,7 @@ export async function stageTable(
   loadId: string,
 ): Promise<StageResult> {
   await duck.run(tableDdl(contract));
+  const relOf = (path: string): string => posix(relative(rawDir, path));
   const table = `stg.${ident(contract.table)}`;
   const pk = ident(contract.primaryKey);
 
@@ -71,7 +75,7 @@ export async function stageTable(
     `select source_file, size::double as size from stg._loaded_files where table_name = ${lit(contract.table)}`,
   );
   const known = new Map(loaded.map((r) => [r.source_file, Number(r.size)]));
-  const pending = files.filter((f) => known.get(relative(rawDir, f.path)) !== f.size);
+  const pending = files.filter((f) => known.get(relOf(f.path)) !== f.size);
   const result: StageResult = {
     table: contract.table,
     filesLoaded: pending.length,
@@ -85,10 +89,11 @@ export async function stageTable(
   };
   if (pending.length === 0) return result;
 
-  const prefix = rawDir.endsWith("/") ? rawDir : `${rawDir}/`;
+  const root = posix(rawDir);
+  const prefix = root.endsWith("/") ? root : `${root}/`;
   await duck.run(`create or replace temp table _batch as
     select * exclude (filename), replace(filename, ${lit(prefix)}, '') as source_file
-    from read_csv([${pending.map((f) => lit(f.path)).join(", ")}],
+    from read_csv([${pending.map((f) => lit(posix(f.path))).join(", ")}],
       all_varchar = true, union_by_name = true, filename = true, hive_partitioning = false)`);
 
   const batchColumns = (await duck.all<{ column_name: string }>("select column_name from (describe _batch)"))
@@ -129,9 +134,9 @@ export async function stageTable(
 
   const columns = [...contract.columns.map((c) => ident(c.name)), "source_file"].join(", ");
   const updateCols = contract.columns.map((c) => `${ident(c.name)} = excluded.${ident(c.name)}`).join(", ");
-  const pendingRelPaths = pending.map((f) => relative(rawDir, f.path));
+  const pendingRelPaths = pending.map((f) => relOf(f.path));
   const fileRows = pending
-    .map((f) => `(${lit(contract.table)}, ${lit(relative(rawDir, f.path))}, ${f.size}, ${lit(loadId)})`)
+    .map((f) => `(${lit(contract.table)}, ${lit(relOf(f.path))}, ${f.size}, ${lit(loadId)})`)
     .join(", ");
 
   // All per-table load writes happen atomically: a crash mid-load cannot leave
