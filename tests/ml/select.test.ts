@@ -85,6 +85,7 @@ describe("runtime router selection", () => {
       embedder: fakeEmbedder(8),
     });
     const result = await r.router.route("hola", "es");
-    expect(result.threshold).toBe(0.42);
+    // 0.42 comes from the model file; the deployed value is floored at POLICY.routerThreshold (0.6).
+    expect(result.threshold).toBe(0.6);
   });
 });

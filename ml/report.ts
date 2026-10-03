@@ -1,4 +1,6 @@
 import { ROUTER_LABELS } from "./dataset";
+import { POLICY } from "../server/policy/config";
+import { deployedThreshold } from "../server/router/threshold";
 import type { ExperimentResult } from "./experiment";
 
 const f = (x: number) => x.toFixed(3);
@@ -36,6 +38,17 @@ export function renderRouterReport(r: ExperimentResult, meta: { model: string; t
   w();
   w(`**Selected:** ${r.selected.router}. ${r.selected.rationale}.`);
   w();
+  const selected = r.routers.find((x) => x.name === r.selected.router);
+  if (selected) {
+    const deployed = deployedThreshold(selected.threshold);
+    const at = deployed === undefined ? undefined : selected.coverageCurve.find((c) => Math.abs(c.threshold - deployed) < 1e-9);
+    w(
+      `**Deployed threshold:** ${deployed?.toFixed(2) ?? "policy default"} (dev threshold ${selected.threshold.toFixed(2)}, floored at the policy's ` +
+        `${POLICY.routerThreshold}; a dev threshold ≥ 0.95 falls back to it)` +
+        (at ? ` — on the test set: coverage ${f(at.coverage)}, misroutes ${f(at.misrouteRate)}.` : "."),
+    );
+    w();
+  }
   if (r.zeroShotSkipped) {
     w(`**gemini-zeroshot was skipped:** ${r.zeroShotSkipped}.`);
     w();

@@ -2,10 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import type { Embedder } from "../llm/embedder";
 import { createEmbeddingRouter, parseLogRegModel } from "./embedding";
 import { createKeywordRouter } from "./keyword";
+import { deployedThreshold } from "./threshold";
 import type { Router } from "./types";
 
-/** Wraps a router so every RouteResult carries `threshold`, when one is known for it; otherwise returns it as-is. */
-function withThreshold(router: Router, threshold: number | undefined): Router {
+/** Wraps a router so every RouteResult carries its deployed threshold (see deployedThreshold), when one is known. */
+function withThreshold(router: Router, devThreshold: number | undefined): Router {
+  const threshold = deployedThreshold(devThreshold);
   if (threshold === undefined) return router;
   return {
     name: router.name,
