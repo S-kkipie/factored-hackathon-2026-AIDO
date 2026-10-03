@@ -128,3 +128,19 @@ describe("nonce payload hashing", () => {
     ).toEqual({ ok: true });
   });
 });
+
+describe("fail closed on unknown or inactive sessions", () => {
+  test("risk functions throw RSK_SESSION for unknown sessions", () => {
+    const ops = makeOps();
+    expect(() => getRisk(ops, "ghost")).toThrow("RSK_SESSION: unknown session ghost");
+    expect(() => addRisk(ops, "ghost", "abstain")).toThrow("RSK_SESSION: unknown session ghost");
+  });
+
+  test("checkBudget requires an active session", () => {
+    for (const status of ["closed", "handed_off"]) {
+      const ops = opsWithSession();
+      ops.query("update sessions set status = ? where session_id = 's1'").run(status);
+      expect(checkBudget(ops, "s1", "2026-10-02", small)).toEqual({ ok: false, ruleId: "BUD_SESSION" });
+    }
+  });
+});

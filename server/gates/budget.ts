@@ -10,9 +10,11 @@ export function checkBudget(
   budgets: Budgets = BUDGETS,
 ): { ok: true } | { ok: false; ruleId: BudgetRule } {
   const s = ops
-    .query<{ turns: number; tokens: number }, [string]>("select turns, tokens from sessions where session_id = ?")
+    .query<{ turns: number; tokens: number; status: string }, [string]>(
+      "select turns, tokens, status from sessions where session_id = ?",
+    )
     .get(sessionId);
-  if (!s) return { ok: false, ruleId: "BUD_SESSION" };
+  if (!s || s.status !== "active") return { ok: false, ruleId: "BUD_SESSION" };
   if (s.turns >= budgets.maxTurns) return { ok: false, ruleId: "BUD_TURNS" };
   if (s.tokens >= budgets.maxTokensPerSession) return { ok: false, ruleId: "BUD_TOKENS" };
   const spent = ops.query<{ usd: number }, [string]>("select usd from spend where day = ?").get(day)?.usd ?? 0;

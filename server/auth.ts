@@ -24,10 +24,16 @@ export class AuthError extends Error {
   }
 }
 
+export type SessionStatus = "active" | "closed" | "handed_off";
+const SESSION_STATUSES: readonly SessionStatus[] = ["active", "closed", "handed_off"];
+
 export interface Auth {
   login(persona: string, pin: string, language: Language): Promise<{ token: string; session: Session }>;
   agentLogin(pin: string): Promise<{ token: string; session: Session }>;
   verify(token: string): Promise<Session>;
+  /** Ends a session: its tokens stop verifying immediately. */
+  revoke(sessionId: string): void;
+  setStatus(sessionId: string, status: SessionStatus): void;
 }
 
 type AuthConfig = Pick<ServerConfig, "jwtSecret" | "sessionTtlSeconds" | "demoPin" | "agentPin">;
@@ -58,6 +64,12 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
     return { token, session };
   };
 
+  const setStatus = (sessionId: string, status: SessionStatus): void => {
+    if (!SESSION_STATUSES.includes(status)) throw new AuthError("IN_AUTH_002", `invalid session status '${String(status)}'`);
+    const changed = ops.query("update sessions set status = ? where session_id = ?").run(status, sessionId).changes;
+    if (changed === 0) throw new AuthError("IN_AUTH_002", `unknown session ${sessionId}`);
+  };
+
   return {
     async login(persona, pin, language) {
       const user = serving.demoUsers().find((d) => d.persona === persona);
@@ -76,7 +88,8 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
         if (e instanceof errors.JWTExpired) throw new AuthError("IN_SESSION_EXPIRED", "session expired");
         throw new AuthError("IN_AUTH_002", "invalid token");
       }
-      const sessionId = String(payload.sid);
+      const sessionId = payload.sid;
+      if (typeof sessionId !== "string" || sessionId.length === 0) throw new AuthError("IN_AUTH_002", "token has no session");
       const row = ops
         .query<{ status: string; language: Language; role: Role; customer_id: string | null }, [string]>(
           "select status, language, role, customer_id from sessions where session_id = ?",
@@ -91,5 +104,7 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
         expiresAt: (payload.exp ?? 0) * 1000,
       };
     },
+    revoke: (sessionId) => setStatus(sessionId, "closed"),
+    setStatus,
   };
 }

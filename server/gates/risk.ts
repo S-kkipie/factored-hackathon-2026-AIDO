@@ -9,14 +9,18 @@ export const RISK_WEIGHTS = {
 
 export type RiskReason = keyof typeof RISK_WEIGHTS;
 
+/** Fails closed: an unknown session has no risk score to report. */
 export function getRisk(ops: Database, sessionId: string): number {
-  return (
-    ops.query<{ r: number }, [string]>("select risk_score as r from sessions where session_id = ?").get(sessionId)?.r ?? 0
-  );
+  const row = ops.query<{ r: number }, [string]>("select risk_score as r from sessions where session_id = ?").get(sessionId);
+  if (!row) throw new Error(`RSK_SESSION: unknown session ${sessionId}`);
+  return row.r;
 }
 
 /** Accumulates per-session risk; policy escalates when it crosses POLICY.riskEscalate. */
 export function addRisk(ops: Database, sessionId: string, reason: RiskReason): number {
-  ops.query("update sessions set risk_score = risk_score + ? where session_id = ?").run(RISK_WEIGHTS[reason], sessionId);
+  const changed = ops
+    .query("update sessions set risk_score = risk_score + ? where session_id = ?")
+    .run(RISK_WEIGHTS[reason], sessionId).changes;
+  if (changed === 0) throw new Error(`RSK_SESSION: unknown session ${sessionId}`);
   return getRisk(ops, sessionId);
 }
