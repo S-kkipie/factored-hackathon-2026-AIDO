@@ -8,3 +8,6 @@ __pycache__/
 docs/*
 !docs/data_findings.md
 !docs/superpowers/
+!docs/research/
+!docs/architecture.html
+.playwright-mcp/

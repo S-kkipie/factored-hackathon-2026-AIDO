@@ -39,9 +39,12 @@ Greetings and thanks are answered without tools.
 2. **Data scope.** Every tool receives the session customer and checks ownership. References to other accounts or documents are denied and logged as unauthorized attempts.
 3. **Automatic dispute intake allowed only if all hold:** transaction belongs to customer; status `Approved`; age ≤ 90 days; `amount_usd` ≤ 500; `fraud_score` < 30; not already disputed.
 4. **Mandatory escalation if any holds:** `amount_usd` > 500; `fraud_score` ≥ 30 (suspected fraud; card block recommended, performed by human); ≥ 3 disputed transactions in one request; repeat complainer; customer status Suspended/Closed; explicit human request; tool failure after retries.
-5. **Confirmation** required before `create_dispute` (graph interrupt).
+5. **Out-of-band confirmation** required before `create_dispute`: the graph interrupts and issues a single-use nonce; only a UI action carrying that nonce resumes the run. A typed "sí" in chat never confirms an action.
 6. **No money movement.** The system never refunds, reverses, or blocks; it only creates cases and handoffs.
 7. **Simulated clock** fixed at 2026-06-17 (last dataset date).
+8. **Provenance.** Every state value carries its source (`jwt`, `db`, `user`, `llm`). Identity and ownership arguments to tools must come from `jwt` or `db`; dispute amount and merchant come from the transaction row, and the customer's own description is stored as an untrusted note (rule `PROV_001`).
+9. **Commitments only from templates.** Timelines, outcomes and approvals ("your dispute was opened, reference D-123; review takes up to N business days") are rendered from policy-owned templates; the model may not state them in its own words.
+10. **Budgets.** Per session: max 30 turns, max 3 LLM calls per turn, max 40k tokens; global daily spend cap. Exceeding any budget ends automation and escalates.
 
 ### 3.3 Handoff payload
 
@@ -60,6 +63,10 @@ JSON validated by schema: request summary, verified facts (with transaction ids)
 | Data pipeline | DuckDB (Node binding, fallback DuckDB CLI) over S3 CSV partitions |
 | App data | `bun:sqlite`: read-only `serving.sqlite` + writable `ops.sqlite` |
 | Frontend | React + Vite + TanStack Router |
+| Agent ↔ UI protocol | AG-UI events over SSE (`@ag-ui/core`, `@ag-ui/encoder`; `@ag-ui/client` in the browser); no CopilotKit |
+| Guardrail signal | Google Model Armor, inspect-only (prompt injection, sensitive data); never decides alone |
+| Tracing | OpenTelemetry GenAI semantic conventions → Langfuse Cloud; hash-chained `audit_events` in SQLite as source of truth |
+| Red teaming | promptfoo (ES/PT, OWASP LLM + Agentic plugins, multi-turn strategies) |
 | Deploy | Single container on Google Cloud Run |
 
 Everything is TypeScript. All code, identifiers, and documentation are in English; customer conversations are Spanish and Portuguese.
@@ -69,17 +76,20 @@ Compatibility risk: LangGraph JS and the DuckDB Node binding under Bun are verif
 ### 4.2 Conversation graph
 
 ```
-START → auth_check → route ─┬─ low confidence  → clarify → END
-                            ├─ out_of_scope    → abstain → END
-                            └─ intent          → extract_slots
+START → input_gate → budget_check → route ─┬─ low confidence → clarify → END
+                                            ├─ out_of_scope   → abstain → END
+                                            └─ intent         → extract_slots → schema_gate
                                   → policy ─┬─ escalate → handoff (interrupt) → END
-                                            ├─ confirm  → confirm (interrupt) → tools
-                                            └─ allow    → tools → verify → respond → END
+                                            ├─ confirm  → confirm (interrupt + nonce) → tools
+                                            └─ allow    → tools → verify → respond → response_gate → END
 ```
 
 - Gemini is called only in `extract_slots`, `clarify`, and `respond`. `respond` may only use tool results and must cite transaction ids.
 - All edges are deterministic code. The router supplies intent + confidence; the policy node supplies the decision + rule ids.
 - State is persisted per session with a SQLite checkpointer in `ops.sqlite`.
+- Nodes that run before an `interrupt()` have no side effects, because LangGraph re-runs the interrupted node on resume; writes happen in the node after the interrupt, guarded by idempotency keys.
+- Session risk score: injection signals (Model Armor, heuristics), abstentions and policy denials accumulate per session; crossing the threshold routes to handoff (defense against multi-turn escalation).
+- Context minimization: `extract_slots` sees only the current message and structured slots, never earlier raw model output.
 
 ### 4.3 Tools (tool layer enforces authorization)
 
@@ -100,6 +110,21 @@ START → auth_check → route ─┬─ low confidence  → clarify → END
 | `web/` | Login, chat, agent console, trace viewer | Eden client |
 | `ml/` | Utterance dataset build, training, router comparison | embeddings, APIs |
 | `eval/` | Scenario runner, deterministic checks, LLM judge, report | running server |
+
+### 4.5 Guardrail gates
+
+| Gate | Mechanism | Stops | Rule prefix |
+|---|---|---|---|
+| 1 Input | JWT session, rate limit, size limit, PII masking, Model Armor inspect (signal), spotlighting/delimiting of untrusted data | expired/forged session, oversized input, PII to model | `IN_` |
+| 1b Budget | turns, LLM calls, tokens, daily spend, circuit breaker on Gemini/Jev errors, `SAFE_MODE` kill switch (templates + escalation only) | unbounded consumption, provider outage | `BUD_` |
+| 2 Router | intent + calibrated confidence, abstain below τ, session risk score | out-of-scope, ambiguity, multi-turn escalation | `RT_` |
+| 3 Schema | TypeBox validation of model JSON, 1 retry, template fallback; provenance tagging of extracted slots as `llm` | malformed output, invented fields | `SC_` |
+| 4 Policy | pure rules → allow / confirm / escalate; provenance check | injection-driven actions, unsafe automation | `POL_`, `PROV_` |
+| 5 Tool | ownership from `jwt`/`db` only, allowlist (no money-moving tools exist), timeout, 2 retries, idempotency keys, nonce check on confirm | cross-customer access, duplicate writes | `TL_` |
+| 6 Verify | read back created case by id; else handoff | silent tool failure | `VF_` |
+| 7 Response | numbers/ids grounded in facts, commitments only from templates, canary token, output PII scan (Luhn cards, CPF, CURP, DNI), cross-customer leak scan, language check; dispute narrative escaped and flagged `untrusted` before storage | hallucination, prompt leakage, data leakage, stored injection | `RS_` |
+
+Detection signals are logged and feed policy; no detector blocks or approves on its own. Gemini model versions are pinned and `safetySettings` set explicitly (`BLOCK_NONE` so scores are returned and logged). Threat mapping: OWASP LLM Top 10 2025 and OWASP Agentic Top 10 2026 (see `docs/research/2026-10-02-harness-guardrails-and-agui.md`).
 
 ## 5. Data pipeline
 
@@ -176,13 +201,18 @@ All utterance data is labeled as team-generated synthetic.
 
 **Business projection:** agent-minutes saved projected from Transactional volume and duration, labeled as projection, never as measured improvement.
 
-**Execution:** `bun run eval` → `reports/eval.md` + raw JSON. Run sizes (full vs subset repeats) decided before running given cost (~$0.03 per scenario estimate).
+**Red teaming:** promptfoo with a custom provider that calls the graph and returns `{output, metadata: {rule_ids, decision, db_diff}}`; `language: [es, pt]`; frameworks `owasp:llm`, `owasp:agentic`; plugins `bola`, `bfla`, `rbac`, `pii`, `cross-session-leak`, `prompt-extraction`, `excessive-agency`, `hallucination`, `indirect-prompt-injection`, `hijacking` plus custom policies; strategies `crescendo`, `goat`, `hydra`, encodings. Suites: A deterministic gate tests; B fixed attack corpus tagged by OWASP id × language × turns; C benign and hard-benign set; D adaptive attacks plus one hour of manual red teaming, reported as a lower bound. Remote-inference strategies are disclosed.
+
+**Security metrics:** attack success rate per class (Wilson CIs); share of blocked attacks where the expected rule fired; benign utility and utility under attack; false refusal rate; over-escalation; under-escalation (must be zero); pass^k (k = 4) for consistency. LLM judge is binary pass/fail, validated on 100–200 human labels with TPR/TNR and Cohen's κ ≥ 0.6.
+
+**Execution:** `bun run eval` → `reports/eval.md` + raw JSON; `bun run redteam` → promptfoo report. Run sizes (full vs subset repeats) decided before running given cost (~$0.03 per scenario estimate).
 
 ## 8. Operations
 
-- **Tracing:** per-node spans (redacted input/output, latency, tokens, cost, model/prompt version, intent + confidence, policy rule ids) in `ops.sqlite`; append-only audit log for actions.
+- **Tracing:** OpenTelemetry spans following GenAI semantic conventions (pinned version): root `invoke_agent` (`gen_ai.conversation.id` = hashed session id), `chat` spans (model, token usage, finish reason), `execute_tool` spans, and one `bank.gate.*` span per gate (`id`, `rule_id`, `decision`, `reason_code`, `policy_version`, `signal_scores`, `latency_ms`). Content capture redacted. Exported to Langfuse Cloud (free tier) and mirrored to `ops.sqlite` for the trace view. OTel Node SDK under Bun is verified first; fallback is direct Langfuse SDK.
+- **Audit:** append-only `audit_events` table with `prev_hash`/`hash` chain for every gate decision and action.
 - **Explanations:** derived from sources, policy rules, and execution records; never from model chain-of-thought.
-- **Fallbacks:** Jev failure → own router; router failure → clarify; Gemini failure → templated reply + handoff. Exceptions are never treated as low risk.
+- **Fallbacks:** Jev failure → own router; router failure → clarify; Gemini failure → templated reply + handoff; circuit breaker opens on sustained provider errors; `SAFE_MODE` disables all model calls. Exceptions are never treated as low risk.
 - **Security:** JWT sessions; tool-level authorization; untrusted data delimited and marked as data in prompts; injection signal from router/Jev feeds policy (never decides alone); per-session rate limit; secrets in GCP Secret Manager; 30-day retention for conversations and traces (configurable).
 - **Capacity:** writable state in container-local SQLite → Cloud Run `max-instances=1`. Documented limit; production path is Postgres/Cloud SQL.
 - **CI/CD:** GitHub Actions runs tests and lint on synthetic fixtures (no S3). Image built locally or via Cloud Build, pushed to Artifact Registry, deployed with `bun run deploy`.
@@ -196,6 +226,8 @@ All utterance data is labeled as team-generated synthetic.
 | `/agent` | Handoff queue and handoff card; human takes over and replies, graph resumes |
 | `/trace/:session` | Per-turn timeline: router, confidence, policy, tools, latency, cost |
 
+Transport: the chat streams AG-UI events from `POST /api/agui/run` (SSE). `STEP_STARTED/FINISHED` and `STATE_DELTA` drive a live status line ("checking policy…", router confidence, rule ids); interrupts arrive as `RUN_FINISHED` with an interrupt outcome and render as confirm/cancel cards carrying the nonce. The server ignores client-supplied `tools`, `context` and `state`, and requires `threadId` to equal the session id in the JWT. The agent console uses REST (`GET /api/agent/queue`, `POST /api/agent/sessions/:id/reply`, `POST /api/agent/sessions/:id/resume`, agent-role JWT); the trace view reads persisted spans with a plain GET.
+
 No metrics dashboard; evaluation results live in `reports/eval.md`, README, and slides.
 
 ## 10. Deliverables
@@ -207,4 +239,4 @@ No metrics dashboard; evaluation results live in `reports/eval.md`, README, and 
 
 ## 11. Out of scope
 
-Live banking integration, money movement, card blocking, credit decisions, streaming ingestion, voice, multi-agent setups, metrics dashboard.
+Live banking integration, money movement, card blocking, credit decisions, streaming ingestion, voice, multi-agent setups, metrics dashboard, CopilotKit runtime and frontend tools.
