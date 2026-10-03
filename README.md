@@ -108,6 +108,7 @@ The baseline and the proposed system replay the same frozen held-out workload: a
 ```
 pipeline/   data contracts, incremental staging, curation, quality report (Bun + DuckDB)
 server/     auth, tools, policy engine, gates, LangGraph graph, API
+web/        React + Vite UI: login, chat, agent console, trace viewer
 supabase/   Postgres migrations (single source of the schema) and CLI config
 tests/      unit and end-to-end tests (bun test)
 reports/    generated data-quality, demand and evaluation reports
@@ -160,6 +161,20 @@ bun run dev                                  # http://localhost:8080
 bun run smoke                                # scripted ES/PT turns over the configured database
 ```
 
+### Web UI
+
+```bash
+bun run web:dev        # http://localhost:5173 (proxies /api to :8080; run `bun run dev` alongside)
+bun run web:build      # web/dist, served by the API server at / (single container)
+```
+
+| Page | Purpose |
+|---|---|
+| `/login` | Pick a demo persona (each one demonstrates a policy path) and ES/PT |
+| `/chat` | Streaming AG-UI chat with a live status line (step, router confidence, decision, rule ids); disputes are confirmed only with the nonce-bearing button; agent replies appear after a handoff |
+| `/agent` | Handoff queue, structured case card, take / reply / resolve |
+| `/trace/:session` | Per-turn span timeline with rule ids, decisions, latency, tokens and cost |
+
 | Route | Purpose |
 |---|---|
 | `GET /api/health` | Liveness check |
@@ -194,7 +209,7 @@ Serving contract (`serving.sqlite` and the Postgres `serving` schema read by the
 | 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
 | 2c | Postgres / Supabase for runtime state and serving data | done |
 | 3 | Intent router: dataset, four-way comparison, calibration | planned |
-| 4 | Web UI: chat, agent console, trace viewer | planned |
+| 4 | Web UI: chat, agent console, trace viewer | done |
 | 5 | Evaluation harness and red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |
 
