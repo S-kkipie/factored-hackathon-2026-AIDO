@@ -36,7 +36,7 @@ export function defaultConfig(overrides: Partial<PipelineConfig> = {}): Pipeline
     recentDays: 90,
     subsetSize: 2000,
     seed: 42,
-    maxAutoUsd: 500,
+    maxAutoUsd: 250,
     fraudScore: 30,
     ...overrides,
   };
