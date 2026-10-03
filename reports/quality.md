@@ -1,16 +1,16 @@
 # Data quality report
 
-Run: `20261003T154212-38e8901a`
+Run: `20261003T155844-c6946f75`
 
-## Load summary (this run)
+## Load summary (all runs)
 
 | table | files_loaded | rows_read | rejected | duplicates_in_batch | inserted | updated | missing_columns | unexpected_columns |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| customers | 0 | 0 | 0 | 0 | 0 | 0 | - | - |
-| products | 0 | 0 | 0 | 0 | 0 | 0 | - | - |
-| transactions | 0 | 0 | 0 | 0 | 0 | 0 | - | - |
-| complaints | 0 | 0 | 0 | 0 | 0 | 0 | - | - |
-| call_center_interactions | 0 | 0 | 0 | 0 | 0 | 0 | - | - |
+| call_center_interactions | 1097 | 686296 | 0 | 0 | 686296 | 0 | - | agent_id, interaction_type, contact_reason, requires_followup, sentiment_score, customer_detected_accent, agent_used_accent, mentioned_products, has_transcript, has_recording |
+| complaints | 1097 | 67095 | 0 | 0 | 67095 | 0 | - | related_branch_id, origin_interaction_id, assigned_agent_id, assignment_date, first_response_date, resolution_date, closing_date, resolution, compensation_granted |
+| customers | 1 | 150000 | 0 | 0 | 150000 | 0 | - | document_number, date_of_birth, gender, email, mobile_phone, landline_phone, address, city, state, postal_code, credit_score, estimated_monthly_income, occupation, marital_status, education_level, registration_branch_id, accepts_marketing |
+| products | 1 | 400000 | 0 | 0 | 400000 | 0 | - | interest_rate, expiration_date, opening_branch_id, opening_channel, has_linked_app, days_past_due, last_transaction_date |
+| transactions | 1097 | 4425008 | 0 | 0 | 4425008 | 0 | - | branch_id, latitude, longitude |
 
 ## customers
 
