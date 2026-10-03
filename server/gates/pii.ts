@@ -35,7 +35,7 @@ interface Detector {
 
 /** Order matters: more specific patterns run first so later ones do not split them. */
 const DETECTORS: Detector[] = [
-  { kind: "email", pattern: /[\w.+-]+@[\w-]+\.[\w.-]+/g, token: "[EMAIL]" },
+  { kind: "email", pattern: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, token: "[EMAIL]" },
   { kind: "cpf", pattern: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, token: "[CPF]", valid: (m) => cpfValid(onlyDigits(m)) },
   { kind: "curp", pattern: /\b[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d\b/gi, token: "[CURP]" },
   {
@@ -47,7 +47,7 @@ const DETECTORS: Detector[] = [
       return d.length >= 13 && d.length <= 19 && luhnValid(d);
     },
   },
-  { kind: "id_doc", pattern: /\b(?:DNI|CC|CE|RG|c[eé]dula)[:\s#nº°.]*\d[\d.]{5,11}\b/gi, token: "[ID_DOC]" },
+  { kind: "id_doc", pattern: /\b(?:DNI|CC|CE|RG|c[eé]dula)[:\s#nº°.]*(?:\p{L}{1,3}\s*){0,2}\d[\d.\-]*\d\b/gu, token: "[ID_DOC]" },
   { kind: "phone", pattern: /\+\d{1,3}[\s-]?\d(?:[\s-]?\d){7,12}\b/g, token: "[PHONE]" },
 ];
 

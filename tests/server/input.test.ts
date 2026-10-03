@@ -24,6 +24,24 @@ describe("maskPii", () => {
     expect(cpfValid("52998224725")).toBe(true);
     expect(cpfValid("11111111111")).toBe(false);
   });
+  test("masks natural-language phrased ID documents", () => {
+    const r1 = maskPii("mi cédula es 30123456");
+    expect(r1.found).toContain("id_doc");
+    expect(/\d/.test(r1.text)).toBe(false);
+    const r2 = maskPii("meu RG é 12.345.678-9");
+    expect(r2.found).toContain("id_doc");
+    expect(/\d/.test(r2.text)).toBe(false);
+  });
+  test("masks dash-suffixed ID documents completely", () => {
+    expect(maskPii("RG 12.345.678-9 es mi documento").text).toBe("[ID_DOC] es mi documento");
+  });
+  test("preserves email trailing punctuation", () => {
+    expect(maskPii("Escribime a ana@mail.com. Gracias").text).toBe("Escribime a [EMAIL]. Gracias");
+  });
+  test("regression: non-PII numbers and transaction IDs are not masked", () => {
+    expect(maskPii("me cobraron $1.234,56 el 10/06/2026 y otro de 45.00 USD").found).toEqual([]);
+    expect(maskPii("el cargo TRX-A1SMALL000000000001 de 45 USD").found).toEqual([]);
+  });
 });
 
 describe("inputGate", () => {
