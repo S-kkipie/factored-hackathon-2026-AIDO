@@ -49,11 +49,33 @@ describe("splits", () => {
     const rows = [...Array.from({ length: 5 }, (_, i) => row(`g${i}`, "f")), ...Array.from({ length: 5 }, (_, i) => row(`h${i}`, "h", "check_balance"))];
     expect(stratifiedSample(rows, 2, 3).length).toBe(4);
   });
+
+  test("ES/PT translation pairs (same family id minus the language prefix) never straddle train/dev", () => {
+    const pairRow = (lang: "es" | "pt", n: number): Utterance => ({
+      id: `${lang}-${n}`,
+      lang,
+      variant: lang === "es" ? "MX" : "BR",
+      label: "dispute_charge",
+      text: `${lang}-text-${n}`,
+      family: `${lang}-dsp-${n}`,
+      source: "human",
+    });
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const rows = Array.from({ length: 10 }, (_, i) => i + 1).flatMap((n) => [pairRow("es", n), pairRow("pt", n)]);
+      const s = splitByFamily(rows, 0.3, seed);
+      for (let n = 1; n <= 10; n++) {
+        const esInDev = s.dev.some((r) => r.id === `es-${n}`);
+        const ptInDev = s.dev.some((r) => r.id === `pt-${n}`);
+        expect(esInDev).toBe(ptInDev);
+      }
+      expect(s.dev.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe("selection rule", () => {
-  const result = (name: string, macroF1: number, oos: number, usd: number) =>
-    ({ name, test: { macroF1 }, outOfScopeRecall: oos, usdPerClassification: usd }) as unknown as RouterResult;
+  const result = (name: string, macroF1: number, oosSafeRate: number, usd: number) =>
+    ({ name, test: { macroF1 }, outOfScopeRecall: oosSafeRate, outOfScopeSafeRate: oosSafeRate, usdPerClassification: usd }) as unknown as RouterResult;
 
   test("picks the best deployable router above the safety floor; zero-shot is never selected", () => {
     const s = selectRouter([result("keyword", 0.6, 0.9, 0), result("embed-lr", 0.85, 0.9, 1e-6), result("gemini-zeroshot", 0.95, 0.95, 1e-4)]);
@@ -65,6 +87,38 @@ describe("selection rule", () => {
     expect(selectRouter([result("keyword", 0.6, 0.9, 0), result("embed-lr", 0.85, 0.5, 1e-6)]).router).toBe("keyword");
     expect(selectRouter([result("keyword", 0.845, 0.9, 0), result("embed-lr", 0.85, 0.9, 1e-6)]).router).toBe("keyword");
   });
+
+  test("the floor is outOfScopeSafeRate, not the plain outOfScopeRecall", () => {
+    const withRates = (name: string, macroF1: number, outOfScopeRecall: number, outOfScopeSafeRate: number, usd: number) =>
+      ({ name, test: { macroF1 }, outOfScopeRecall, outOfScopeSafeRate, usdPerClassification: usd }) as unknown as RouterResult;
+    // embed-lr has a low plain recall (abstentions aren't hits) but a high safe rate (those abstentions clarify
+    // instead of misrouting); it should still clear the floor and win on macro-F1.
+    const s = selectRouter([withRates("keyword", 0.6, 0.9, 0.5, 0), withRates("embed-lr", 0.85, 0.1, 0.95, 1e-6)]);
+    expect(s.router).toBe("embed-lr");
+    expect(s.rationale).toContain("safe rate 0.950");
+  });
+
+  test("a keyword-like router that abstains on everything gets out_of_scope recall 0 under the new scoring", async () => {
+    const abstainer: Router = { name: "fake-keyword", route: async () => ({ label: "out_of_scope", confidence: 0, router: "fake-keyword" }) };
+    const deps = {
+      test: await testSet(),
+      train: await seeds(),
+      embedder: fakeEmbedder(32),
+      keyword: abstainer,
+      zeroShot: null,
+      seed: 7,
+      zeroShotDevPerGroup: 2,
+      latencySample: 1,
+      l2Grid: [1e-3],
+      epochs: 10,
+    };
+    const r = await runExperiment(deps);
+    const kw = r.routers.find((x) => x.name === "keyword")!;
+    // Before the fix, an abstention labeled out_of_scope at confidence 0 was scored as a correct out_of_scope
+    // prediction, inflating recall to 1. It is now "__abstain__" for scoring, so recall on the real class is 0.
+    expect(kw.outOfScopeRecall).toBe(0);
+    expect(kw.outOfScopeSafeRate).toBeGreaterThan(0);
+  }, 30_000);
 });
 
 describe("runExperiment (fake embedder, no network)", () => {

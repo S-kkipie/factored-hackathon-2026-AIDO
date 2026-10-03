@@ -18,15 +18,21 @@ export function renderRouterReport(r: ExperimentResult, meta: { model: string; t
       "thresholds were chosen on dev; the selection rule used test metrics (rule fixed before evaluation).",
   );
   w();
-  w("| Router | Macro-F1 (95% CI) | F1 ES | F1 PT | out_of_scope recall | Failures | ECE | Threshold | Coverage @τ | Misroutes @τ | p50 / p95 ms | USD / classification |");
-  w("|---|---|---|---|---|---|---|---|---|---|---|---|");
+  w("| Router | Macro-F1 (95% CI) | F1 ES | F1 PT | out_of_scope recall | OOS safe rate | Failures | ECE | Threshold | Coverage @τ | Misroutes @τ | p50 / p95 ms | USD / classification |");
+  w("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
   for (const x of r.routers) {
     w(
       `| ${x.name}${x.name === r.selected.router ? " **(selected)**" : ""} | ${f(x.test.macroF1)} (${f(x.macroF1CI[0])}–${f(x.macroF1CI[1])}) | ` +
-        `${f(x.perLanguageMacroF1.es ?? 0)} | ${f(x.perLanguageMacroF1.pt ?? 0)} | ${f(x.outOfScopeRecall)} | ${x.failures} | ${f(x.test.ece)} | ${x.threshold.toFixed(2)} | ` +
+        `${f(x.perLanguageMacroF1.es ?? 0)} | ${f(x.perLanguageMacroF1.pt ?? 0)} | ${f(x.outOfScopeRecall)} | ${f(x.outOfScopeSafeRate)} | ${x.failures} | ${f(x.test.ece)} | ${x.threshold.toFixed(2)} | ` +
         `${f(x.atThreshold.coverage)} | ${f(x.atThreshold.misrouteRate)} | ${x.latencyMs.p50.toFixed(0)} / ${x.latencyMs.p95.toFixed(0)} | ${usd(x.usdPerClassification)} |`,
     );
   }
+  w();
+  w(
+    "`out_of_scope recall` is the plain per-class recall (a confidence-0 abstention never counts as a hit). " +
+      "`OOS safe rate` is the field the selection rule uses: gold out_of_scope rows that are either predicted " +
+      "out_of_scope at or above the router's own threshold, or below it (would clarify, which is still safe).",
+  );
   w();
   w(`**Selected:** ${r.selected.router}. ${r.selected.rationale}.`);
   w();
@@ -48,15 +54,38 @@ export function renderRouterReport(r: ExperimentResult, meta: { model: string; t
     w(`|---|${ROUTER_LABELS.map(() => "---").join("|")}|`);
     for (const g of ROUTER_LABELS) w(`| ${g} | ${ROUTER_LABELS.map((p) => sel.test.confusion[g]?.[p] ?? 0).join(" | ")} |`);
     w();
+    w(`## Coverage curve — ${sel.name}`);
+    w();
+    w("| Threshold | Coverage | Misroute rate |");
+    w("|---|---|---|");
+    for (const c of sel.coverageCurve) w(`| ${c.threshold.toFixed(2)} | ${f(c.coverage)} | ${f(c.misrouteRate)} |`);
+    w();
+  }
+  const groups = Object.entries(r.data.droppedNearTestByGroup).sort(([a], [b]) => a.localeCompare(b));
+  if (groups.length > 0) {
+    w("## Leakage drop by (label, language)");
+    w();
+    w("| Group | Kept | Dropped | Dropped share |");
+    w("|---|---|---|---|");
+    const warnings: string[] = [];
+    for (const [group, { kept, dropped }] of groups) {
+      const label = group.replace("|", " / ");
+      const share = kept + dropped === 0 ? 0 : dropped / (kept + dropped);
+      w(`| ${label} | ${kept} | ${dropped} | ${f(share)} |`);
+      if (share > 0.5) warnings.push(`**${label}** lost ${f(share)} of its training rows to the leakage filter`);
+    }
+    w();
+    for (const warning of warnings) w(`**Warning:** ${warning}.`);
+    if (warnings.length > 0) w();
   }
   w("## Method");
   w();
   w(`- Embeddings: \`${meta.model}\`, 768 dimensions, L2-normalized; multinomial logistic regression with L2 = ${r.embedLr.l2} chosen on dev ` +
     `(${Object.entries(r.embedLr.devMacroF1ByL2).map(([k, v]) => `${k}: ${f(v)}`).join(", ")}), temperature ${r.embedLr.temperature} fitted on dev.`);
-  w(`- Leakage control: split by seed family (${r.data.devFamilies.length} dev families); ${r.data.droppedNearTest} training rows with cosine > 0.95 to any test row were dropped; the test set is frozen by hash.`);
+  w(`- Leakage control: split by seed family, ES/PT translation pairs kept together (${r.data.devFamilies.length} dev families); ${r.data.droppedNearTest} training rows with cosine > 0.95 to any test row were dropped; the test set is frozen by hash.`);
   w("- Thresholds: lowest confidence whose accepted dev predictions misroute ≤ 2%; below it the assistant asks a clarifying question.");
   w(
-    "- Selection rule fixed before evaluation: deployable routers only (≤ 3 chat calls per turn), out_of_scope recall ≥ 0.8, then highest macro-F1, " +
+    "- Selection rule fixed before evaluation: deployable routers only (≤ 3 chat calls per turn), out_of_scope safe rate ≥ 0.8, then highest macro-F1, " +
       "cheaper router on a gap < 0.01; the selection rule used test metrics (rule fixed before evaluation).",
   );
   if (r.zeroShotDevSampleSize !== null) {

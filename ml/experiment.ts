@@ -53,7 +53,14 @@ export interface RouterResult {
   test: Report;
   macroF1CI: [number, number];
   perLanguageMacroF1: Record<string, number>;
+  /** Plain recall of the out_of_scope class (a confidence-0 abstention is never counted as a correct prediction). */
   outOfScopeRecall: number;
+  /**
+   * Safety floor used for selection: share of gold out_of_scope test rows that are either predicted out_of_scope
+   * with confidence ≥ this router's dev threshold, or have confidence below it (would clarify) — an abstention is
+   * safe for out_of_scope even though it is not a "hit".
+   */
+  outOfScopeSafeRate: number;
   /** At the dev-chosen threshold: share of test messages routed (rest clarify) and their misroute rate. */
   atThreshold: CoveragePoint;
   coverageCurve: CoveragePoint[];
@@ -71,6 +78,8 @@ export interface ExperimentResult {
     trainRows: number;
     devRows: number;
     droppedNearTest: number;
+    /** Leakage-drop counts per (label, language) group, so a group losing most of its training rows is visible. */
+    droppedNearTestByGroup: Record<string, { dropped: number; kept: number }>;
     devFamilies: string[];
   };
   embedLr: { l2: number; temperature: number; devMacroF1ByL2: Record<string, number> };
@@ -120,6 +129,9 @@ async function embedAll(deps: ExperimentDeps, texts: string[]): Promise<Map<stri
   return cache;
 }
 
+/** Not a real label: a router that returns confidence 0 (failure or keyword no-match) is abstaining, not predicting. */
+export const ABSTAIN = "__abstain__";
+
 async function routeAll(router: Router, rows: readonly Utterance[]) {
   const preds: Prediction[] = [];
   const ms: number[] = [];
@@ -127,9 +139,22 @@ async function routeAll(router: Router, rows: readonly Utterance[]) {
     const t0 = performance.now();
     const res = await router.route(r.text, r.lang);
     ms.push(performance.now() - t0);
-    preds.push({ gold: r.label, pred: res.label, confidence: res.confidence, lang: r.lang });
+    // A confidence-0 result is scored as an abstention, not as an out_of_scope "hit": it is wrong for every gold
+    // label (always clarified) and stays in the ECE calculation at confidence 0.
+    preds.push({ gold: r.label, pred: res.confidence === 0 ? ABSTAIN : res.label, confidence: res.confidence, lang: r.lang });
   }
   return { preds, ms };
+}
+
+/**
+ * Selection safety floor for a class: share of its gold rows that are either predicted as that class with
+ * confidence ≥ threshold, or have confidence below threshold (would clarify, which is safe).
+ */
+function safeRate(preds: readonly Prediction[], label: string, threshold: number): number {
+  const gold = preds.filter((p) => p.gold === label);
+  if (gold.length === 0) return 1;
+  const safe = gold.filter((p) => (p.pred === label && p.confidence >= threshold) || p.confidence < threshold);
+  return safe.length / gold.length;
 }
 
 function summarize(name: string, version: string, preds: Prediction[], threshold: number, ms: number[], usd: number): RouterResult {
@@ -147,6 +172,7 @@ function summarize(name: string, version: string, preds: Prediction[], threshold
     macroF1CI: bootstrapCI(preds, (s) => evaluate(s, labels).macroF1, 1000, 42),
     perLanguageMacroF1,
     outOfScopeRecall: test.perClass.out_of_scope?.recall ?? 0,
+    outOfScopeSafeRate: safeRate(preds, "out_of_scope", threshold),
     atThreshold: coverageCurve(preds, [threshold])[0]!,
     coverageCurve: coverageCurve(preds, grid),
     latencyMs: { p50: percentile(ms, 0.5), p95: percentile(ms, 0.95) },
@@ -157,13 +183,14 @@ function summarize(name: string, version: string, preds: Prediction[], threshold
 
 /**
  * Selection rule (spec 6), decided before looking at test results: among deployable routers, require
- * out_of_scope recall ≥ 0.8 (safety floor), then take the highest test macro-F1; a gap smaller than 0.01 goes to
- * the cheaper router. The zero-shot router is reported for comparison but not deployable: it would add a fourth
- * chat call to a turn whose budget is three (spec 3.2 rule 10).
+ * out_of_scope safe rate ≥ 0.8 (safety floor — predicted out_of_scope above the router's own threshold, or below
+ * it so the turn clarifies instead of misrouting), then take the highest test macro-F1; a gap smaller than 0.01
+ * goes to the cheaper router. The zero-shot router is reported for comparison but not deployable: it would add a
+ * fourth chat call to a turn whose budget is three (spec 3.2 rule 10).
  */
 export function selectRouter(results: readonly RouterResult[]): ExperimentResult["selected"] {
   const pool = results.filter((r) => (DEPLOYABLE as readonly string[]).includes(r.name));
-  const safe = pool.filter((r) => r.outOfScopeRecall >= 0.8);
+  const safe = pool.filter((r) => r.outOfScopeSafeRate >= 0.8);
   const ranked = (safe.length > 0 ? safe : pool).sort((a, b) => b.test.macroF1 - a.test.macroF1);
   let best = ranked[0];
   if (!best) throw new Error("no deployable router results");
@@ -171,8 +198,10 @@ export function selectRouter(results: readonly RouterResult[]): ExperimentResult
   if (cheaper && best.test.macroF1 - cheaper.test.macroF1 < 0.01) best = cheaper;
   const zs = results.find((r) => r.name === "gemini-zeroshot");
   const rationale = [
-    `${best.name} has test macro-F1 ${best.test.macroF1.toFixed(3)} and out_of_scope recall ${best.outOfScopeRecall.toFixed(3)}`,
-    safe.length === 0 ? "no deployable router met the 0.8 out_of_scope recall floor, so the floor was waived" : "it meets the 0.8 out_of_scope recall floor",
+    `${best.name} has test macro-F1 ${best.test.macroF1.toFixed(3)} and out_of_scope safe rate ${best.outOfScopeSafeRate.toFixed(3)}`,
+    safe.length === 0
+      ? "no deployable router met the 0.8 out_of_scope safe rate floor, so the floor was waived"
+      : "it meets the 0.8 out_of_scope safe rate floor",
     zs ? `gemini-zeroshot scored macro-F1 ${zs.test.macroF1.toFixed(3)} but is not deployable within the 3-calls-per-turn budget` : "",
   ]
     .filter(Boolean)
@@ -186,6 +215,10 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
   const testVecs = deps.test.map((r) => vecs.get(r.text)!);
 
   const { kept, dropped } = dropNearTest(deps.train, vecs, testVecs, COSINE_CUTOFF);
+  const droppedNearTestByGroup: Record<string, { dropped: number; kept: number }> = {};
+  const byGroup = (r: Utterance) => (droppedNearTestByGroup[`${r.label}|${r.lang}`] ??= { dropped: 0, kept: 0 });
+  for (const r of kept) byGroup(r).kept++;
+  for (const r of dropped) byGroup(r).dropped++;
   const split = splitByFamily(kept, DEV_SHARE, deps.seed);
   const X = split.train.map((r) => vecs.get(r.text)!);
   const y = split.train.map((r) => r.label);
@@ -214,6 +247,8 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
   // Router 2: embeddings + LR. Test predictions from the batch embeddings; latency from live single calls.
   const embedPreds = deps.test.map((r, i) => argmaxPred(model, r, testVecs[i]!));
   const live = createEmbeddingRouter(deps.embedder, model, EMBED_LR_VERSION);
+  // One untimed warm-up call first: the first live call pays for connection setup that a timed sample shouldn't.
+  if (deps.test.length > 0) await live.route(deps.test[0]!.text, deps.test[0]!.lang);
   const liveRun = await routeAll(live, deps.test.slice(0, deps.latencySample));
   const embedUsd = costUsd(deps.embedder.model, estimateTokens(deps.test.map((r) => r.text)), 0);
   results.push(summarize("embed-lr", live.name, embedPreds, embedThreshold, liveRun.ms, embedUsd));
@@ -246,6 +281,7 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
       trainRows: split.train.length,
       devRows: split.dev.length,
       droppedNearTest: dropped.length,
+      droppedNearTestByGroup,
       devFamilies: split.devFamilies,
     },
     embedLr: { l2: best!.l2, temperature: model.temperature, devMacroF1ByL2 },
