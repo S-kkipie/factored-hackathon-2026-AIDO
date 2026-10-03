@@ -21,9 +21,10 @@ export interface Llm {
   generate(req: LlmRequest): Promise<LlmResponse>;
 }
 
-/** USD per 1M tokens for the pinned model (Gemini 3.8 Flash introductory price, 2026). */
+/** USD per 1M tokens (Gemini 3.8 Flash introductory price and gemini-embedding-001 paid tier, 2026). */
 export const PRICING: Record<string, { input: number; output: number }> = {
   "gemini-3.8-flash": { input: 0.75, output: 3.75 },
+  "gemini-embedding-001": { input: 0.15, output: 0 },
 };
 
 /** Unknown models are priced at a deliberately high rate so the spend cap fails safe. */
