@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { canonicalJson, sha256Hex } from "../hash";
+import type { RuleIdWithPrefix } from "../rules";
 
 interface NonceContext {
   sessionId: string;
@@ -7,7 +8,7 @@ interface NonceContext {
   payload: unknown;
 }
 
-export type NonceRule = "TL_NONCE_UNKNOWN" | "TL_NONCE_USED" | "TL_NONCE_EXPIRED" | "TL_NONCE_MISMATCH";
+export type NonceRule = Extract<RuleIdWithPrefix<"TL">, `TL_NONCE_${string}`>;
 
 /** Key order never changes the hash: payloads are serialized as canonical JSON. */
 const hashPayload = (payload: unknown) => sha256Hex(canonicalJson(payload));

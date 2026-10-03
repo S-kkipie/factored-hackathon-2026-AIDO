@@ -1,7 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { BUDGETS, type Budgets } from "../policy/config";
+import type { RuleIdWithPrefix } from "../rules";
 
-export type BudgetRule = "BUD_TURNS" | "BUD_TOKENS" | "BUD_SPEND" | "BUD_SESSION";
+export type BudgetRule = Exclude<RuleIdWithPrefix<"BUD">, "BUD_CALLS">;
 
 export function checkBudget(
   ops: Database,

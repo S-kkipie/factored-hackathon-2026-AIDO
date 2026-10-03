@@ -1,0 +1,60 @@
+/**
+ * Registry of every rule id a gate, policy or tool can emit. Prefixes: IN_ input/auth, BUD_ budgets,
+ * RT_ router, SC_ schema, POL_ policy, PROV_ provenance, TL_ tools, VF_ verify, RS_ response, RSK_ risk score.
+ */
+export const RULE_IDS = [
+  "IN_EMPTY",
+  "IN_SIZE",
+  "IN_RATE",
+  "IN_AUTH_001",
+  "IN_AUTH_002",
+  "IN_SESSION_EXPIRED",
+  "IN_SESSION_REVOKED",
+  "BUD_TURNS",
+  "BUD_TOKENS",
+  "BUD_SPEND",
+  "BUD_SESSION",
+  "BUD_CALLS",
+  "SC_INVALID",
+  "POL_STATUS",
+  "POL_HUMAN",
+  "POL_RISK",
+  "POL_SCOPE",
+  "POL_READ",
+  "POL_DSP_NO_TARGET",
+  "POL_DSP_MANY",
+  "POL_DSP_AMOUNT",
+  "POL_DSP_FRAUD",
+  "POL_DSP_STATUS",
+  "POL_DSP_TYPE",
+  "POL_DSP_AGE",
+  "POL_DSP_DUP",
+  "POL_DSP_OK",
+  "POL_REPEAT",
+  "PROV_001",
+  "TL_FAIL",
+  "TL_NOT_FOUND",
+  "TL_OWNER",
+  "TL_EMPTY",
+  "TL_BAD_INPUT",
+  "TL_IDEMPOTENCY_MISMATCH",
+  "TL_NOT_DISPUTABLE",
+  "TL_ALREADY_DISPUTED",
+  "TL_NONCE_UNKNOWN",
+  "TL_NONCE_USED",
+  "TL_NONCE_EXPIRED",
+  "TL_NONCE_MISMATCH",
+  "RS_CANARY",
+  "RS_PII",
+  "RS_ID",
+  "RS_AMOUNT",
+  "RS_COMMIT",
+  "RS_LANG",
+  "RSK_SESSION",
+] as const;
+
+export type RuleId = (typeof RULE_IDS)[number];
+export type RuleIdWithPrefix<P extends string> = Extract<RuleId, `${P}_${string}`>;
+
+const KNOWN: ReadonlySet<string> = new Set(RULE_IDS);
+export const isRuleId = (id: string): id is RuleId => KNOWN.has(id);

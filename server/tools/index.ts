@@ -3,6 +3,7 @@ import { Value } from "@sinclair/typebox/value";
 import type { Complaint, Product, ServingDb, Transaction, TxFilter } from "../db/serving";
 import { canonicalJson, sha256Hex } from "../hash";
 import { type Val, trusted, val } from "../provenance";
+import { type RuleId, isRuleId } from "../rules";
 import { ToolError } from "./runtime";
 import { type DisputeReason, DisputeReasonSchema, type HandoffCard, HandoffCardSchema, TxFilterSchema } from "./schemas";
 
@@ -38,7 +39,7 @@ export interface CreateDisputeInput {
 export interface CreateHandoffInput {
   sessionId: string;
   customerId: Val<string>;
-  ruleIds: string[];
+  ruleIds: RuleId[];
   card: HandoffCard;
   idempotencyKey: string;
 }
@@ -210,6 +211,9 @@ export function createTools(serving: ServingDb, ops: Database, now: () => Date =
       const tool = "createHandoff";
       const customerId = customer(input.customerId);
       if (!Value.Check(HandoffCardSchema, input.card)) throw new ToolError("TL_BAD_INPUT", tool, "invalid handoff card");
+      if (![...input.ruleIds, ...input.card.ruleIds].every(isRuleId)) {
+        throw new ToolError("TL_BAD_INPUT", tool, "unknown rule id");
+      }
       const payloadHash = sha256Hex(canonicalJson({ customer: customerId, ruleIds: input.ruleIds, card: input.card }));
       const byKey = () =>
         ops

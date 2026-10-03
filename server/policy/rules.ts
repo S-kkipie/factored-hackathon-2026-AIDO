@@ -1,5 +1,6 @@
 import type { Customer, Transaction } from "../db/serving";
 import type { Val } from "../provenance";
+import type { RuleIdWithPrefix } from "../rules";
 import { POLICY, type Policy } from "./config";
 
 export type Intent =
@@ -22,9 +23,11 @@ export interface PolicyInput {
   riskScore: number;
 }
 
+export type PolicyRuleId = RuleIdWithPrefix<"POL"> | RuleIdWithPrefix<"PROV">;
+
 export interface Decision {
   action: Action;
-  ruleIds: string[];
+  ruleIds: PolicyRuleId[];
   policyVersion: string;
 }
 
@@ -42,13 +45,13 @@ const ageDays = (tx: Transaction, clock: string) =>
  * short-circuits: when it escalates, dispute-level reasons are not evaluated or reported.
  */
 export function decide(input: PolicyInput, p: Policy = POLICY): Decision {
-  const result = (action: Action, ruleIds: Iterable<string>): Decision => ({
+  const result = (action: Action, ruleIds: Iterable<PolicyRuleId>): Decision => ({
     action,
     ruleIds: [...new Set(ruleIds)].sort(),
     policyVersion: p.version,
   });
 
-  const gate: string[] = [];
+  const gate: PolicyRuleId[] = [];
   if (input.customer.customer_status !== "Active") gate.push("POL_STATUS");
   if (input.intent === "request_human") gate.push("POL_HUMAN");
   if (!(input.riskScore < p.riskEscalate)) gate.push("POL_RISK");
@@ -60,7 +63,7 @@ export function decide(input: PolicyInput, p: Policy = POLICY): Decision {
 
   const targets = [...new Map(input.targets.map((t) => [t.v.transaction_id, t.v])).values()];
   if (targets.length === 0) return result("clarify", ["POL_DSP_NO_TARGET"]);
-  const reasons = new Set<string>();
+  const reasons = new Set<PolicyRuleId>();
   if (targets.length > p.maxTxPerDispute) reasons.add("POL_DSP_MANY");
   for (const t of targets) {
     if (t.amount_usd === null || !(t.amount_usd <= p.maxAutoUsd)) reasons.add("POL_DSP_AMOUNT");

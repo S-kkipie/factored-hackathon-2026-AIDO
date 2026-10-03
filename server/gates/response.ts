@@ -1,3 +1,4 @@
+import type { RuleIdWithPrefix } from "../rules";
 import { maskPii, normalizeText } from "./pii";
 
 export interface FactAmount {
@@ -18,9 +19,11 @@ export interface ResponseContext {
   canary: string;
 }
 
+export type ResponseRuleId = RuleIdWithPrefix<"RS">;
+
 export interface ResponseCheck {
   ok: boolean;
-  ruleIds: string[];
+  ruleIds: ResponseRuleId[];
 }
 
 const ID_PATTERN = /\b(?:CLI|PRD|TRX|CMP|D|H)-[A-Z0-9]{6,24}\b/g;
@@ -157,7 +160,7 @@ export function detectLanguage(text: string): "es" | "pt" | "unknown" {
 export function responseGate(rawText: string, facts: ResponseFacts, ctx: ResponseContext): ResponseCheck {
   // Full-width digits and zero-width characters must not hide anything from the checks below.
   const text = normalizeText(rawText);
-  const rules = new Set<string>();
+  const rules = new Set<ResponseRuleId>();
   if (rawText.includes(ctx.canary) || text.includes(normalizeText(ctx.canary))) rules.add("RS_CANARY");
   const masked = maskPii(text);
   if (masked.found.length > 0) rules.add("RS_PII");

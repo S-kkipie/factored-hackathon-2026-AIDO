@@ -1,8 +1,9 @@
 import { ProvenanceError } from "../provenance";
+import type { RuleIdWithPrefix } from "../rules";
 
 export class ToolError extends Error {
   constructor(
-    readonly ruleId: string,
+    readonly ruleId: RuleIdWithPrefix<"TL">,
     readonly tool: string,
     message: string,
     readonly retryable = false,

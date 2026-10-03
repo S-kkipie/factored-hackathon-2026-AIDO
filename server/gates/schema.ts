@@ -1,9 +1,10 @@
 import type { Static, TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+import type { RuleId } from "../rules";
 
 export type SchemaResult<T> =
   | { ok: true; value: T; attempts: number }
-  | { ok: false; ruleId: "SC_INVALID"; errors: string[]; attempts: number };
+  | { ok: false; ruleId: Extract<RuleId, "SC_INVALID">; errors: string[]; attempts: number };
 
 function parse(raw: unknown): { data?: unknown; error?: string } {
   if (typeof raw !== "string") return { data: raw };

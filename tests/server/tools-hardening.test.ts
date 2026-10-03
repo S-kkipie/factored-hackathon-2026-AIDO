@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Value } from "@sinclair/typebox/value";
 import { openServing } from "../../server/db/serving";
 import { val } from "../../server/provenance";
+import type { RuleId } from "../../server/rules";
 import { type HandoffCard, HandoffCardSchema, DisputeReasonSchema, TxFilterSchema, createTools } from "../../server/tools";
 import { toModelCustomer, toModelDispute, toModelProduct, toModelTransaction } from "../../server/tools/views";
 import { FIXTURE, makeOps, makeServing } from "./fixtures";
@@ -140,7 +141,7 @@ describe("createHandoff hardening", () => {
   const input = (over: Record<string, unknown> = {}) => ({
     sessionId: "s1",
     customerId: me,
-    ruleIds: ["POL_DSP_AMOUNT"],
+    ruleIds: ["POL_DSP_AMOUNT"] as RuleId[],
     card,
     idempotencyKey: "h1",
     ...over,
@@ -209,5 +210,16 @@ describe("model-facing views", () => {
     const md = toModelDispute(d.v);
     assertClean(md);
     expect(Object.keys(md)).not.toContain("customer_note");
+  });
+});
+
+describe("createHandoff rule ids", () => {
+  test("unknown rule ids are rejected", () => {
+    const { tools } = setup();
+    const base = { sessionId: "s1", customerId: me, card, idempotencyKey: "h9" };
+    expect(errorRule(() => tools.createHandoff({ ...base, ruleIds: ["POL_MADE_UP" as RuleId] }))).toBe("TL_BAD_INPUT");
+    expect(errorRule(() => tools.createHandoff({ ...base, ruleIds: [], card: { ...card, ruleIds: ["POL_MADE_UP"] } }))).toBe(
+      "TL_BAD_INPUT",
+    );
   });
 });

@@ -3,6 +3,7 @@ import { SignJWT, errors, jwtVerify } from "jose";
 import type { ServerConfig } from "./config";
 import type { ServingDb } from "./db/serving";
 import { type Val, val } from "./provenance";
+import type { RuleId } from "./rules";
 
 export type Role = "customer" | "agent";
 export type Language = "es" | "pt";
@@ -17,7 +18,7 @@ export interface Session {
 
 export class AuthError extends Error {
   constructor(
-    readonly ruleId: "IN_AUTH_001" | "IN_AUTH_002" | "IN_SESSION_EXPIRED" | "IN_SESSION_REVOKED",
+    readonly ruleId: Extract<RuleId, `IN_AUTH_${string}` | `IN_SESSION_${string}`>,
     message: string,
   ) {
     super(`${ruleId}: ${message}`);

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { RuleId } from "../rules";
 import { type PiiKind, maskPii } from "./pii";
 
 export interface InputLimits {
@@ -8,7 +9,7 @@ export interface InputLimits {
 
 export type InputGateResult =
   | { ok: true; text: string; piiFound: PiiKind[] }
-  | { ok: false; ruleId: "IN_EMPTY" | "IN_SIZE" | "IN_RATE" };
+  | { ok: false; ruleId: Extract<RuleId, "IN_EMPTY" | "IN_SIZE" | "IN_RATE"> };
 
 const DEFAULT_LIMITS: InputLimits = { maxChars: 1000, perMinute: 12 };
 
