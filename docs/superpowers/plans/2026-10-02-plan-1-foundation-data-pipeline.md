@@ -1019,7 +1019,7 @@ describe("stageTable", () => {
       unexpectedColumns: [],
     });
     expect(
-      await duck.one(
+      await duck.one<Record<string, unknown>>(
         "select transaction_status, transaction_country, source_file, load_id from stg.transactions where transaction_id = 'T1'",
       ),
     ).toEqual({
@@ -1066,9 +1066,9 @@ describe("stageTable", () => {
       "load-3",
     );
     expect(late).toMatchObject({ filesLoaded: 2, rowsRead: 2, inserted: 1, updated: 1 });
-    expect(await duck.one("select count(*)::integer as n from stg.transactions")).toEqual({ n: 7 });
+    expect(await duck.one<Record<string, unknown>>("select count(*)::integer as n from stg.transactions")).toEqual({ n: 7 });
     expect(
-      await duck.one("select transaction_status, load_id from stg.transactions where transaction_id = 'T2'"),
+      await duck.one<Record<string, unknown>>("select transaction_status, load_id from stg.transactions where transaction_id = 'T2'"),
     ).toEqual({ transaction_status: "Reversed", load_id: "load-3" });
     duck.close();
   });
