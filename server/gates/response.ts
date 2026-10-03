@@ -23,7 +23,7 @@ const WORDS = String.raw`(?:USD|MXN|COP|ARS|BRL|pesos|d[oó]lares|reais)`;
 const NUMBER = String.raw`(\d[\d.,]*\d|\d)`;
 const AMOUNT_PATTERN = new RegExp(String.raw`${CURRENCY}\s*${NUMBER}|${NUMBER}\s*${WORDS}`, "gi");
 const COMMITMENT =
-  /\b(reembols\w*|reintegr\w*|devolv\w*|abon\w*|aprob\w*|aprov\w*|garantiz\w*|estorn\w*|ressarc\w*|garantim\w*)\b|\b(?:en|dentro de|em|até)\s+\d+\s+(?:d[ií]as|horas)\b/i;
+  /\b(reembols\w*|reintegr\w*|devolv\w*|abon(?:a(?:r|mos|remos|ré|rá|ndo)|ad[oa]s?)\w*|aprob(?:ad[oa]s?|amos|aremos|aré|ará)\w*|aprov(?:ad[oa]s?|amos|aremos|aré|ará)\w*|garantiz\w*|estorn\w*|ressarc\w*|garantim\w*)\b|\b(?:en|dentro de|em|até)\s+\d+\s+(?:d[ií]as|horas)\b/i;
 // Unicode-aware word boundaries: JavaScript's \b treats accented letters as non-word characters.
 const ES_MARKERS = /(?<!\p{L})(?:el|los|las|usted|cuenta|cargo|puedo|gracias|sí|su|del|ya|eso|esto|son|también|fue)(?!\p{L})|ñ|¿|¡/giu;
 const PT_MARKERS = /(?<!\p{L})(?:você|não|sua|seu|conta|cobrança|posso|obrigad[oa]|é|do|da|já|isso|isto|são|também|nós|foi)(?!\p{L})|ção|ções|ã|õ/giu;

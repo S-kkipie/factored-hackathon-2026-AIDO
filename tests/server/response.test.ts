@@ -49,6 +49,21 @@ describe("responseGate", () => {
     expect(responseGate("Su tarjeta 4111 1111 1111 1111 está activa.", facts, es).ruleIds).toEqual(["RS_PII"]);
     expect(responseGate("Você não reconhece essa cobrança na sua conta?", facts, es).ruleIds).toEqual(["RS_LANG"]);
   });
+
+  test("allows ordinary banking language with narrowed commitment stems", () => {
+    // "abono" as noun (deposit) should not trigger RS_COMMIT
+    expect(responseGate("El abono de USD 45 se registró el 10/06.", facts, es).ok).toBe(true);
+    expect(responseGate("Veo un abono de USD 45 en tu cuenta.", facts, es).ok).toBe(true);
+    // "aprobación" as noun (approval status) should not trigger RS_COMMIT
+    expect(responseGate("Tu aprobación está en proceso.", facts, es).ok).toBe(true);
+    expect(responseGate("A aprovação está pendente.", facts, { ...es, language: "pt" }).ok).toBe(true);
+    // "aprovechar" (to benefit) and "aprobar" infinitive should not trigger RS_COMMIT
+    expect(responseGate("Puedes aprovechar la promoción.", facts, es).ok).toBe(true);
+    expect(responseGate("El sistema puede aprobar o rechazar automáticamente.", facts, es).ok).toBe(true);
+    // Verify RS_COMMIT is specifically absent
+    expect(responseGate("El abono de USD 45 se registró el 10/06.", facts, es).ruleIds).not.toContain("RS_COMMIT");
+    expect(responseGate("Tu aprobación está en proceso.", facts, es).ruleIds).not.toContain("RS_COMMIT");
+  });
 });
 
 describe("helpers", () => {
