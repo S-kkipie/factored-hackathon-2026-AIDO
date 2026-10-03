@@ -116,13 +116,18 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
       where.push("checkpoint_id < ?");
       args.push(String(before));
     }
-    const limit = options?.limit ? ` limit ${Math.max(1, Math.trunc(options.limit))}` : "";
-    const sql = `select * from checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by checkpoint_id desc${limit}`;
+    const sql = `select * from checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by checkpoint_id desc`;
+    let yielded = 0;
+    const limit = options?.limit ? Math.max(1, Math.trunc(options.limit)) : undefined;
     for (const row of this.db.query<CheckpointRow, string[]>(sql).all(...args)) {
       const tuple = await this.toTuple(row);
       const filter = options?.filter ?? {};
       const meta = tuple.metadata as Record<string, unknown> | undefined;
-      if (Object.entries(filter).every(([k, v]) => v === undefined || meta?.[k] === v)) yield tuple;
+      if (Object.entries(filter).every(([k, v]) => v === undefined || meta?.[k] === v)) {
+        yield tuple;
+        yielded++;
+        if (limit !== undefined && yielded >= limit) break;
+      }
     }
   }
 
@@ -156,18 +161,25 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
       throw new Error("putWrites needs thread_id and checkpoint_id");
     }
     const checkpoint_ns = String(config.configurable?.checkpoint_ns ?? "");
-    const special = writes.every(([channel]) => channel in WRITES_IDX_MAP);
     const rows = await Promise.all(
       writes.map(async ([channel, value], idx) => {
         const [type, data] = await this.serde.dumpsTyped(value);
-        return [thread_id, checkpoint_ns, String(checkpoint_id), taskId, WRITES_IDX_MAP[channel] ?? idx, channel, type, data] as const;
+        const writeIdx = WRITES_IDX_MAP[channel] ?? idx;
+        return [thread_id, checkpoint_ns, String(checkpoint_id), taskId, writeIdx, channel, type, data, writeIdx < 0] as const;
       }),
     );
-    const stmt = this.db.query(
-      `insert ${special ? "or replace" : "or ignore"} into writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+    const stmtReplace = this.db.query(
+      `insert or replace into writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const stmtIgnore = this.db.query(
+      `insert or ignore into writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     this.db.transaction(() => {
-      for (const r of rows) stmt.run(...r);
+      for (const r of rows) {
+        const [threadId, ns, cpId, task, idx, channel, type, value, isSpecial] = r;
+        const stmt = isSpecial ? stmtReplace : stmtIgnore;
+        stmt.run(threadId, ns, cpId, task, idx, channel, type, value);
+      }
     })();
   }
 

@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Annotation, Command, END, START, StateGraph, interrupt } from "@langchain/langgraph";
+import { emptyCheckpoint } from "@langchain/langgraph-checkpoint";
 import { openOps } from "../../server/db/ops";
 import { BunSqliteSaver } from "../../server/graph/checkpointer";
 
@@ -63,5 +64,44 @@ describe("BunSqliteSaver", () => {
     const limited = [];
     for await (const t of saver.list({ configurable: { thread_id: "t" } }, { limit: 1 })) limited.push(t);
     expect(limited.length).toBe(1);
+  });
+
+  test("putWrites: special channels replace, regular channels ignore", async () => {
+    const db = openOps(":memory:");
+    const saver = new BunSqliteSaver(db);
+    const cpId = "cp-" + Date.now();
+    const taskId = "task-" + Date.now();
+    const cfg = {
+      configurable: { thread_id: "thread1", checkpoint_id: cpId },
+    };
+
+    // Create initial checkpoint with empty state
+    const checkpoint = emptyCheckpoint();
+    checkpoint.id = cpId;
+    const metadata = { source: "input" as const, step: 0, parents: {} };
+    await saver.put(cfg, checkpoint, metadata, {});
+
+    // First putWrites call with mixed batch: regular write "n"=1 and error
+    await saver.putWrites(cfg, [["n", 1], ["__error__", { message: "first" }]], taskId);
+
+    // Second putWrites call with same taskId and mixed batch: regular write "n"=2 and error
+    await saver.putWrites(cfg, [["n", 2], ["__error__", { message: "second" }]], taskId);
+
+    // Verify: get the checkpoint and check pendingWrites
+    const tuple = await saver.getTuple(cfg);
+    expect(tuple).toBeDefined();
+
+    if (!tuple) return;
+    const pending = tuple.pendingWrites;
+    if (!pending) return;
+
+    const nWrite = pending.find(([, channel]) => channel === "n");
+    const errorWrite = pending.find(([, channel]) => channel === "__error__");
+
+    // Regular write "n" should have kept its first value (insert or ignore)
+    expect(nWrite?.[2]).toBe(1);
+
+    // Error write should have second value (insert or replace)
+    expect(errorWrite?.[2]).toEqual({ message: "second" });
   });
 });
