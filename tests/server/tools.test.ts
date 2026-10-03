@@ -72,7 +72,7 @@ describe("tools", () => {
     };
     const first = tools.createDispute(input);
     const second = tools.createDispute(input);
-    expect(first.v.dispute_id).toMatch(/^D-[0-9A-F]{8}$/);
+    expect(first.v.dispute_id).toMatch(/^D-[0-9A-F]{12}$/);
     expect(second.v.dispute_id).toBe(first.v.dispute_id);
     expect(first.v).toMatchObject({ amount_usd: 45, status: "received", transaction_ids: [FIXTURE.txSmall] });
     expect(first.v.customer_note).toBe("No reconozco scriptalert(1)/script este cargo");
@@ -124,6 +124,7 @@ describe("tools", () => {
       sessionId: "s1",
       customerId: me,
       ruleIds: ["POL_DSP_AMOUNT"],
+      idempotencyKey: "s1:handoff-1",
       card: {
         summary: "Disputa de cargo alto",
         verifiedFacts: [{ kind: "transaction", id: FIXTURE.txLarge, detail: "USD 700 Boutique Moda" }],

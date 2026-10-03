@@ -8,11 +8,12 @@ const MIGRATIONS = `
   create table if not exists disputes (
     dispute_id text primary key, idempotency_key text not null unique, session_id text not null,
     customer_id text not null, transaction_ids text not null, reason text not null, customer_note text,
-    note_untrusted integer not null default 1, amount_usd real not null, status text not null, created_at text not null);
+    note_untrusted integer not null default 1, amount_usd real not null, status text not null, created_at text not null,
+    payload_hash text);
   create table if not exists handoffs (
-    handoff_id text primary key, session_id text not null, customer_id text not null, rule_ids text not null,
-    card text not null, status text not null default 'queued', created_at text not null,
-    taken_by text, resolved_at text);
+    handoff_id text primary key, idempotency_key text unique, payload_hash text, session_id text not null,
+    customer_id text not null, rule_ids text not null, card text not null, status text not null default 'queued',
+    created_at text not null, taken_by text, resolved_at text);
   create table if not exists nonces (
     nonce text primary key, session_id text not null, interrupt_id text not null, payload_hash text not null,
     expires_at integer not null, used_at integer);
