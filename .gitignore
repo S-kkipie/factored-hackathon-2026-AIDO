@@ -3,6 +3,7 @@ data/
 .env
 *.pyc
 __pycache__/
+node_modules/
 
 # Organizer materials stay local (the data dictionary contains AWS credentials)
 docs/*
