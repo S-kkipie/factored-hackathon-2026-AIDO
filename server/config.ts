@@ -22,6 +22,8 @@ export interface ServerConfig {
   spendLedgerPath: string;
   /** Hard cap on total project LLM spend in USD (default 3). */
   llmTotalCapUsd: number;
+  /** `ROUTER`: auto (experiment's selection), keyword or embed-lr. */
+  router: "auto" | "keyword" | "embed-lr";
 }
 
 /** Parses a required-positive-integer env var, falling back when unset; throws a clear message otherwise. */
@@ -37,6 +39,12 @@ function nonNegativeNumber(name: string, raw: string | undefined, fallback: numb
   const n = raw === undefined ? fallback : Number(raw);
   if (!Number.isFinite(n) || n < 0) throw new Error(`${name} must be a finite non-negative number, got '${raw}'`);
   return n;
+}
+
+function routerChoice(raw: string | undefined): ServerConfig["router"] {
+  const v = raw ?? "auto";
+  if (v !== "auto" && v !== "keyword" && v !== "embed-lr") throw new Error(`ROUTER must be auto, keyword or embed-lr, got '${raw}'`);
+  return v;
 }
 
 export function loadServerConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
@@ -57,5 +65,6 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     port: positiveInt("PORT", env.PORT, 8080),
     spendLedgerPath: env.SPEND_LEDGER_PATH ?? join(ROOT, "data/spend-ledger.sqlite"),
     llmTotalCapUsd: nonNegativeNumber("LLM_TOTAL_CAP_USD", env.LLM_TOTAL_CAP_USD, 3),
+    router: routerChoice(env.ROUTER),
   };
 }

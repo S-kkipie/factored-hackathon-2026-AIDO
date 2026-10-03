@@ -43,6 +43,13 @@ describe("plan 2b configuration", () => {
     expect(POLICY.disputeReviewDays).toBe(10);
   });
 
+  test("ROUTER defaults to auto and accepts only known routers", () => {
+    const base = { JWT_SECRET: "x".repeat(32) };
+    expect(loadServerConfig(base).router).toBe("auto");
+    expect(loadServerConfig({ ...base, ROUTER: "embed-lr" }).router).toBe("embed-lr");
+    expect(() => loadServerConfig({ ...base, ROUTER: "gemini" })).toThrow("ROUTER");
+  });
+
   test("the project LLM spend cap defaults to USD 3 and rejects invalid values", () => {
     const base = { JWT_SECRET: "x".repeat(32) };
     expect(loadServerConfig(base).llmTotalCapUsd).toBe(3);

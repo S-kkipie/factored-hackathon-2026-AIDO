@@ -153,9 +153,18 @@ bun run smoke                                # scripted ES/PT turns over data/se
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
 
-Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`, `LLM_TOTAL_CAP_USD` (default `3`: hard cap on total project LLM spend), `SPEND_LEDGER_PATH` (default `data/spend-ledger.sqlite`, shared by the server, smoke and later eval/ML scripts; calls that could cross the cap are refused with `BUD_TOTAL` and the turn falls back to templates or a handoff).
+Optional env: `ROUTER` (`auto` default, `keyword`, `embed-lr`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`, `LLM_TOTAL_CAP_USD` (default `3`: hard cap on total project LLM spend), `SPEND_LEDGER_PATH` (default `data/spend-ledger.sqlite`, shared by the server, smoke and later eval/ML scripts; calls that could cross the cap are refused with `BUD_TOTAL` and the turn falls back to templates or a handoff).
 
 **Limits:** the per-session lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are in-process state — run a single instance (e.g. Cloud Run `--max-instances=1`); that state (and the SQLite-backed sessions, checkpoints and queue) is lost on restart. The production path is Postgres/Redis for this state (see [Known limitations](#known-limitations)). `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
+
+### Train the intent router
+
+```bash
+bun run ml:generate   # seeds + Gemini paraphrases → ml/data/router-train.jsonl (~$0.15)
+bun run train         # keyword vs Gemini zero-shot vs embeddings + logistic regression → reports/router.md (~$0.10)
+```
+
+The test set (`ml/data/router-test.csv`, 237 hand-written ES/PT utterances) is frozen by hash before any model selection; training data is team-generated (hand-written seeds in `ml/data/router-seeds.csv` expanded by Gemini) and labeled as synthetic. `bun run train` writes `experiments/<run_id>.json`, `reports/router.md`, `ml/models/router-embed-lr.json` and `ml/models/router-selection.json`; the server's `ROUTER=auto` (default) follows that selection, `ROUTER=keyword|embed-lr` overrides it. Both scripts respect the project spend cap plus `ML_RUN_LIMIT_USD` (default `0.5`) per run; embeddings are cached in `data/ml-cache/`.
 
 Pipeline outputs:
 - `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
@@ -169,10 +178,10 @@ Pipeline outputs:
 
 | Plan | Scope | Status |
 |---|---|---|
-| 1 | Foundation and data pipeline | in progress |
-| 2a | Core domain: auth, tools, policy, gates | planned |
-| 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | planned |
-| 3 | Intent router: dataset, four-way comparison, calibration | planned |
+| 1 | Foundation and data pipeline | done |
+| 2a | Core domain: auth, tools, policy, gates | done |
+| 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
+| 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | in progress |
 | 4 | Web UI: chat, agent console, trace viewer | planned |
 | 5 | Evaluation harness and red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |
