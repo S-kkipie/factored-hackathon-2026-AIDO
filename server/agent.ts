@@ -77,7 +77,7 @@ const heldBy = (ops: Database, sessionId: string, agentSessionId: string) =>
 /** A human reply to the customer. Only the agent holding the handoff may reply. */
 export function agentReply(ops: Database, sessionId: string, agentSessionId: string, text: string, now = new Date()): boolean {
   if (!heldBy(ops, sessionId, agentSessionId)) return false;
-  const clean = sanitizeNote(text).slice(0, 1000);
+  const clean = sanitizeNote(text);
   if (clean.length === 0) return false;
   ops.query("insert into messages (session_id, author, text, at) values (?, 'agent', ?, ?)").run(sessionId, clean, now.toISOString());
   appendAudit(ops, { sessionId, kind: "agent_reply", payload: { chars: clean.length } });

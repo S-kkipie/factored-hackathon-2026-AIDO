@@ -36,6 +36,14 @@ export function createApp(deps: AppDeps) {
   };
 
   return new Elysia()
+    .onError(({ code, error }) => {
+      // Elysia's own 4xx responses (bad body, unknown route, unparsable request) pass through unchanged.
+      if (code === "VALIDATION" || code === "NOT_FOUND" || code === "PARSE") return;
+      // Anything else (a thrown Error from a route, e.g. a rethrown non-AuthError) is an internal failure: log
+      // only the error name server-side and never let its message (which may contain internal paths or SQL) reach the client.
+      console.error(error instanceof Error ? error.name : "unknown error");
+      return json(500, { error: "internal" });
+    })
     .get("/api/health", () => ({ ok: true }))
     .get("/api/demo-users", () => deps.serving.demoUsers().map((u) => ({ persona: u.persona })))
     .post(
@@ -120,7 +128,7 @@ export function createApp(deps: AppDeps) {
         if ("error" in r) return r.error;
         return agentReply(deps.ops, params.id, r.session.sessionId, body.text) ? { ok: true } : json(409, { ok: false });
       },
-      { body: t.Object({ text: t.String({ minLength: 1, maxLength: 1000 }) }) },
+      { body: t.Object({ text: t.String({ minLength: 1, maxLength: 500 }) }) },
     )
     .post("/api/agent/sessions/:id/resume", async ({ request, params }) => {
       const r = await asAgent(request);

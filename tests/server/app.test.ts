@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../../server/app";
+import type { Auth } from "../../server/auth";
 import { FIXTURE } from "./fixtures";
 import { harness } from "./graph-harness";
 import { byPurpose } from "./llm-fake";
@@ -50,6 +51,37 @@ describe("auth routes", () => {
     const res = await call("/api/auth/login", { method: "POST", body: JSON.stringify({ persona: "normal", pin: "0000", language: "es" }) });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ ruleId: "IN_AUTH_001" });
+  });
+});
+
+describe("error handling", () => {
+  test("an unexpected error from a route is a generic 500 with no leaked message", async () => {
+    const h = await harness();
+    const auth: Auth = {
+      ...h.auth,
+      login: async () => {
+        throw new Error("secret-internal: select * from sessions");
+      },
+    };
+    const app = createApp({ ...h.deps, auth });
+    const res = await app.handle(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ persona: "normal", pin: "2468", language: "es" }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).not.toContain("secret-internal");
+    expect(JSON.parse(text)).toEqual({ error: "internal" });
+  });
+
+  test("a request validation failure is still a 4xx, not a 500", async () => {
+    const { call } = await setup();
+    const res = await call("/api/auth/login", { method: "POST", body: JSON.stringify({ persona: "normal", pin: "2468", language: "fr" }) });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
   });
 });
 
