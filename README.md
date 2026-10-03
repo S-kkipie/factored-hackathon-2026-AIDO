@@ -131,6 +131,26 @@ bun test
 
 The dataset and the derived `serving.sqlite` are distributed to participants only. They are never committed to this public repository.
 
+### Run the assistant API
+
+```bash
+export JWT_SECRET=$(openssl rand -hex 32)   # required, ≥ 32 chars
+export GEMINI_API_KEY=...                    # optional; without it the assistant uses templates and escalates
+bun run dev                                  # http://localhost:8080
+bun run smoke                                # scripted ES/PT turns over data/serving.sqlite
+```
+
+| Route | Purpose |
+|---|---|
+| `POST /api/auth/login` | Demo login `{persona, pin, language}` → JWT (15 min) |
+| `POST /api/agui/run` | AG-UI `RunAgentInput` → SSE events; `threadId` must be the session id |
+| `GET /api/chat/messages` | Agent replies for a handed-off customer |
+| `POST /api/auth/agent` | Agent login |
+| `GET /api/agent/queue`, `POST /api/agent/sessions/:id/{take,reply,resume}` | Agent console |
+| `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
+
+Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`.
+
 Pipeline outputs:
 - `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
 - `data/marts/*.parquet`: demand evidence.

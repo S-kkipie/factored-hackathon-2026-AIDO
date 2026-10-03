@@ -6,7 +6,10 @@
     "download": "bun pipeline/download.ts",
     "pipeline": "bun pipeline/run.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev": "bun --watch server/main.ts",
+    "start": "bun server/main.ts",
+    "smoke": "bun server/smoke.ts"
   },
   "dependencies": {
     "@ag-ui/core": "1.0.1",
