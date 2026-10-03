@@ -42,6 +42,15 @@ describe("maskPii", () => {
     expect(maskPii("me cobraron $1.234,56 el 10/06/2026 y otro de 45.00 USD").found).toEqual([]);
     expect(maskPii("el cargo TRX-A1SMALL000000000001 de 45 USD").found).toEqual([]);
   });
+  test("id_doc is case-insensitive and requires minimum length", () => {
+    expect(maskPii("dni 30123456").text).toBe("[ID_DOC]");
+    expect(maskPii("Cédula 30123456").found).toContain("id_doc");
+    expect(maskPii("dni: 30123456 y monto 45").text).toBe("[ID_DOC] y monto 45");
+  });
+  test("amounts and years are not masked as id_doc", () => {
+    expect(maskPii("pagué con mi CC de 45 USD").found).toEqual([]);
+    expect(maskPii("la CE de 2026").found).toEqual([]);
+  });
 });
 
 describe("inputGate", () => {

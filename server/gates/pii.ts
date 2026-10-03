@@ -47,7 +47,7 @@ const DETECTORS: Detector[] = [
       return d.length >= 13 && d.length <= 19 && luhnValid(d);
     },
   },
-  { kind: "id_doc", pattern: /\b(?:DNI|CC|CE|RG|c[eé]dula)[:\s#nº°.]*(?:\p{L}{1,3}\s*){0,2}\d[\d.\-]*\d\b/gu, token: "[ID_DOC]" },
+  { kind: "id_doc", pattern: /\b(?:DNI|CC|CE|RG|c[eé]dula)[:\s#nº°.]*(?:\p{L}{1,3}\s*){0,2}\d(?:[\d.\-]*\d){5,}\b/giu, token: "[ID_DOC]" },
   { kind: "phone", pattern: /\+\d{1,3}[\s-]?\d(?:[\s-]?\d){7,12}\b/g, token: "[PHONE]" },
 ];
 
