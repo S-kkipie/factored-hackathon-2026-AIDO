@@ -10,7 +10,8 @@
     "dev": "bun --watch server/main.ts",
     "start": "bun server/main.ts",
     "smoke": "bun server/smoke.ts",
-    "ml:generate": "bun ml/generate.ts"
+    "ml:generate": "bun ml/generate.ts",
+    "train": "bun ml/train.ts"
   },
   "dependencies": {
     "@ag-ui/core": "1.0.1",
