@@ -1,6 +1,9 @@
 import { Command } from "@langchain/langgraph";
 import { describe, expect, test } from "bun:test";
+import { render } from "../../server/policy/templates";
 import { listSpans } from "../../server/trace";
+import { ToolError } from "../../server/tools/runtime";
+import { drive, type TurnDeps, type TurnEvent } from "../../server/graph/turn";
 import { FIXTURE } from "./fixtures";
 import { doneOf, harness, interruptOf, messageOf } from "./graph-harness";
 import { byPurpose, fakeLlm } from "./llm-fake";
@@ -279,6 +282,41 @@ describe("escalation and safety", () => {
     expect(h.handoffs().length).toBe(1);
   });
 
+  test("a budget escalation after an earlier handoff was resolved uses its own idempotency key", async () => {
+    const h = await harness();
+    const first = await h.send("Quiero hablar con un agente");
+    expect(doneOf(first).outcome).toBe("handoff");
+    expect(h.handoffs().length).toBe(1);
+    expect(h.status()).toBe("handed_off");
+
+    // Simulate the agent console resolving the handoff (same effect as agent.ts's takeSession + resolveSession).
+    h.ops.query("update handoffs set status = 'resolved' where session_id = ?").run(h.sessionId);
+    h.ops.query("update sessions set status = 'active' where session_id = ?").run(h.sessionId);
+
+    h.ops.query("update sessions set tokens = 40000").run();
+    const second = await h.send("hola");
+    expect(doneOf(second).ruleIds).toContain("BUD_TOKENS");
+    expect(doneOf(second).outcome).toBe("handoff");
+    expect(h.handoffs().length).toBe(2);
+    expect(h.status()).toBe("handed_off");
+  });
+
+  test("a handoff that cannot be created is reported as handoff_failed, not handoff", async () => {
+    const h = await harness({
+      tools: (real) => ({
+        ...real,
+        createHandoff: () => {
+          throw new ToolError("TL_FAIL", "createHandoff", "boom");
+        },
+      }),
+    });
+    const ev = await h.send("Quiero hablar con un agente");
+    expect(doneOf(ev).outcome).toBe("handoff_failed");
+    expect(messageOf(ev)).toBe(render("handoff_failed", "es"));
+    expect(h.handoffs()).toEqual([]);
+    expect(h.status()).not.toBe("handed_off");
+  });
+
   test("every node leaves a span", async () => {
     const h = await harness({ script: byPurpose({}, "Su saldo es 1200.50 USD.") });
     await h.send("¿Cuál es mi saldo?");
@@ -291,5 +329,19 @@ describe("escalation and safety", () => {
   test("Portuguese sessions get Portuguese templates", async () => {
     const h = await harness({ language: "pt" });
     expect(messageOf(await h.send("Quero um empréstimo"))).toContain("fora do que posso atender");
+  });
+});
+
+describe("drive()", () => {
+  test("a run that ends without ever setting an outcome defaults to clarify, not answered", async () => {
+    const fakeApp = {
+      stream: async function* () {
+        yield { someNode: {} };
+      },
+      getState: async () => ({ values: { reply: "", outcome: null, ruleIds: [] } }),
+    };
+    const events: TurnEvent[] = [];
+    for await (const e of drive({} as TurnDeps, fakeApp as never, "sid", {} as never, Date.now())) events.push(e);
+    expect(doneOf(events).outcome).toBe("clarify");
   });
 });

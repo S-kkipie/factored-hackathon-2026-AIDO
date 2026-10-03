@@ -11,7 +11,7 @@ import { type TurnDeps, type TurnEvent, canaryFor, resumeTurn, runTurn } from ".
 import type { Llm } from "../../server/llm/types";
 import { createKeywordRouter } from "../../server/router/keyword";
 import { Tracer } from "../../server/trace";
-import { createTools } from "../../server/tools";
+import { createTools, type Tools } from "../../server/tools";
 import { makeOps, makeServing } from "./fixtures";
 import { type Script, fakeLlm } from "./llm-fake";
 
@@ -42,6 +42,8 @@ export interface HarnessOptions {
   safeMode?: boolean;
   /** Extra serving-db rows (e.g. another auto-dispute-eligible transaction) for tests that need more than the base fixture. */
   seedServingSql?: string;
+  /** Wraps the real tools, for tests that need one tool call to fail in a controlled way. */
+  tools?: (real: Tools) => Tools;
 }
 
 /** A logged-in customer with real tools, policy, router, checkpointer and audit; only the model is scripted. */
@@ -57,11 +59,12 @@ export async function harness(o: HarnessOptions = {}) {
   const auth = createAuth(AUTH_CFG, serving, ops);
   const { token, session } = await auth.login(o.persona ?? "normal", "2468", o.language ?? "es");
   const llm = o.llm === undefined ? fakeLlm(o.script ?? (() => "{}")) : o.llm;
+  const realTools = createTools(serving, ops);
   const deps: TurnDeps = {
     cfg: { safeMode: o.safeMode ?? false, modelTimeoutMs: 1000, canarySecret: "canary-secret" },
     serving,
     ops,
-    tools: createTools(serving, ops),
+    tools: o.tools ? o.tools(realTools) : realTools,
     auth,
     router: createKeywordRouter(),
     llm,

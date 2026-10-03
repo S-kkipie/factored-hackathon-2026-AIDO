@@ -20,6 +20,15 @@ export interface ServerConfig {
   port: number;
 }
 
+/** Parses a required-positive-integer env var, falling back when unset; throws a clear message otherwise. */
+function positiveInt(name: string, raw: string | undefined, fallback: number): number {
+  const n = raw === undefined ? fallback : Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    throw new Error(`${name} must be a finite positive integer, got '${raw}'`);
+  }
+  return n;
+}
+
 export function loadServerConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
   const secret = env.JWT_SECRET;
   if (!secret || secret.length < 32) throw new Error("JWT_SECRET must be set to at least 32 characters");
@@ -33,8 +42,8 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     safeMode: env.SAFE_MODE === "1",
     geminiApiKey: env.GEMINI_API_KEY || null,
     geminiModel: env.GEMINI_MODEL ?? "gemini-3.8-flash",
-    modelTimeoutMs: Number(env.MODEL_TIMEOUT_MS ?? 15000),
+    modelTimeoutMs: positiveInt("MODEL_TIMEOUT_MS", env.MODEL_TIMEOUT_MS, 15000),
     canarySecret: secret,
-    port: Number(env.PORT ?? 8080),
+    port: positiveInt("PORT", env.PORT, 8080),
   };
 }

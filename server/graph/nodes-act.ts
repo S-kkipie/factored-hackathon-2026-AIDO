@@ -29,7 +29,7 @@ export const confirmNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
   const value: ConfirmInterrupt = {
     kind: "confirm_dispute",
     payload: confirmPayload(s),
-    text: render("confirm_dispute", d.language, { transactions: s.targets.map((t) => t.v) }),
+    text: render("confirm_dispute", d.language, { transactions: s.targets.map((t) => t.v), reason: s.slots?.v.reason ?? "unrecognized" }),
   };
   const answer: unknown = interrupt(value);
   return { confirmation: isConfirmation(answer) ? answer : { approved: false, interruptId: "", payloadHash: "" } };
@@ -141,6 +141,6 @@ export const handoffNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
     audit(d, "handoff", [...ruleIds, e.ruleId]);
-    return { reply: render("handoff_failed", d.language), outcome: "handoff", ruleIds: addRules(ruleIds, e.ruleId) };
+    return { reply: render("handoff_failed", d.language), outcome: "handoff_failed", ruleIds: addRules(ruleIds, e.ruleId) };
   }
 };

@@ -1,6 +1,6 @@
 import type { Language } from "../auth";
 import type { Product, Transaction } from "../db/serving";
-import type { Dispute } from "../tools";
+import type { Dispute, DisputeReason } from "../tools";
 import { POLICY } from "./config";
 
 /**
@@ -39,9 +39,18 @@ interface Params {
   transactions?: Transaction[];
   dispute?: Dispute;
   handoffId?: string;
+  reason?: DisputeReason;
 }
 
 const list = (txs: Transaction[] | undefined) => (txs ?? []).map((t) => `• ${txLine(t)}`).join("\n");
+
+/** The dispute reason in words — this is what the confirmation nonce is bound to, so the customer must see it. */
+const REASON_WORDS: Record<DisputeReason, Record<Language, string>> = {
+  unrecognized: { es: "cargo no reconocido", pt: "cobrança não reconhecida" },
+  incorrect_amount: { es: "monto incorrecto", pt: "valor incorreto" },
+  duplicate: { es: "cargo duplicado", pt: "cobrança duplicada" },
+};
+const reasonWord = (reason: DisputeReason | undefined, lang: Language): string => REASON_WORDS[reason ?? "unrecognized"][lang];
 
 const TEXT: Record<TemplateId, Record<Language, (p: Params) => string>> = {
   greeting: {
@@ -77,8 +86,8 @@ const TEXT: Record<TemplateId, Record<Language, (p: Params) => string>> = {
     pt: () => "Seu caso está com um atendente humano. Deixamos sua mensagem e ele responderá por este chat.",
   },
   confirm_dispute: {
-    es: (p) => `Voy a registrar una disputa por estos movimientos:\n${list(p.transactions)}\nConfirme con el botón para continuar.`,
-    pt: (p) => `Vou registrar uma contestação destas movimentações:\n${list(p.transactions)}\nConfirme no botão para continuar.`,
+    es: (p) => `Voy a registrar una disputa por ${reasonWord(p.reason, "es")} en estos movimientos:\n${list(p.transactions)}\nConfirme con el botón para continuar.`,
+    pt: (p) => `Vou registrar uma contestação por ${reasonWord(p.reason, "pt")} nestas movimentações:\n${list(p.transactions)}\nConfirme no botão para continuar.`,
   },
   dispute_created: {
     es: (p) =>

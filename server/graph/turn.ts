@@ -93,7 +93,7 @@ function graphFor(deps: TurnDeps, session: CustomerSession, turn: number, now: D
 const threadOf = (sessionId: string) => ({ configurable: { thread_id: sessionId } });
 
 /** Streams one graph run, translating node updates into events; issues the nonce if the run pauses. */
-async function* drive(
+export async function* drive(
   deps: TurnDeps,
   app: ConversationGraph,
   sessionId: string,
@@ -131,11 +131,18 @@ async function* drive(
     return;
   }
   yield { type: "message", text: values.reply };
-  yield { type: "done", outcome: values.outcome ?? "answered", ruleIds: values.ruleIds };
+  // A graph that ended without ever setting an outcome is not a success; default to a safe clarify, not answered.
+  yield { type: "done", outcome: values.outcome ?? "clarify", ruleIds: values.ruleIds };
 }
 
-/** Escalation outside the graph (budget exhausted): a minimal handoff card, then the session is handed off. */
-function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId, turn: number): void {
+/**
+ * Escalation outside the graph (budget exhausted): a minimal handoff card, then the session is handed off.
+ * Keyed distinctly from the graph's own `handoffNode` (`${sessionId}:turn-${turn}`): both can fire for the same
+ * turn count (budget is checked before `recordTurn`), and reusing that key would collide with a different
+ * payload — `TL_IDEMPOTENCY_MISMATCH`, caught below, with nothing actually queued. Returns whether the handoff
+ * was actually created, so the caller can report `handoff` vs. `handoff_failed`.
+ */
+function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId, turn: number): boolean {
   try {
     deps.tools.createHandoff({
       sessionId: session.sessionId,
@@ -149,12 +156,14 @@ function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId
         openQuestions: [],
         language: session.language,
       },
-      idempotencyKey: `${session.sessionId}:turn-${turn}`,
+      idempotencyKey: `${session.sessionId}:budget-${ruleId}-${turn}`,
     });
     deps.auth.setStatus(session.sessionId, "handed_off");
+    return true;
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
     appendAudit(deps.ops, { sessionId: session.sessionId, kind: "handoff", ruleId: e.ruleId, payload: {} });
+    return false;
   }
 }
 
@@ -222,9 +231,9 @@ async function* runTurnLocked(deps: TurnDeps, session: CustomerSession, text: st
   const budget = checkBudget(deps.ops, sid, now.toISOString().slice(0, 10));
   if (!budget.ok) {
     appendAudit(deps.ops, { sessionId: sid, kind: "budget", ruleId: budget.ruleId, payload: {} });
-    escalateDirect(deps, session, budget.ruleId, turnsOf(deps.ops, sid));
-    yield { type: "message", text: render("budget_exhausted", lang) };
-    yield { type: "done", outcome: "handoff", ruleIds: [budget.ruleId] };
+    const escalated = escalateDirect(deps, session, budget.ruleId, turnsOf(deps.ops, sid));
+    yield { type: "message", text: render(escalated ? "budget_exhausted" : "handoff_failed", lang) };
+    yield { type: "done", outcome: escalated ? "handoff" : "handoff_failed", ruleIds: [budget.ruleId] };
     return;
   }
 

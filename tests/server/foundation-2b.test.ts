@@ -42,4 +42,18 @@ describe("plan 2b configuration", () => {
     expect(POLICY.routerThreshold).toBe(0.6);
     expect(POLICY.disputeReviewDays).toBe(10);
   });
+
+  test("MODEL_TIMEOUT_MS and PORT must be finite positive integers", () => {
+    const base = { JWT_SECRET: "x".repeat(32) };
+    expect(() => loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "0" })).toThrow("MODEL_TIMEOUT_MS");
+    expect(() => loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "-5" })).toThrow("MODEL_TIMEOUT_MS");
+    expect(() => loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "1.5" })).toThrow("MODEL_TIMEOUT_MS");
+    expect(() => loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "nope" })).toThrow("MODEL_TIMEOUT_MS");
+    expect(() => loadServerConfig({ ...base, PORT: "0" })).toThrow("PORT");
+    expect(() => loadServerConfig({ ...base, PORT: "-1" })).toThrow("PORT");
+    expect(loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "5000", PORT: "3000" })).toMatchObject({
+      modelTimeoutMs: 5000,
+      port: 3000,
+    });
+  });
 });

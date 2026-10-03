@@ -36,7 +36,7 @@ export interface ToolResults {
   dispute?: Val<Dispute>;
 }
 
-export type Outcome = "greeting" | "clarify" | "abstain" | "answered" | "handoff" | "dispute_created" | "cancelled";
+export type Outcome = "greeting" | "clarify" | "abstain" | "answered" | "handoff" | "handoff_failed" | "dispute_created" | "cancelled";
 
 /** Answer the turn runner passes when resuming a confirmation interrupt (never client-supplied as-is). */
 export interface Confirmation {

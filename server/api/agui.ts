@@ -139,8 +139,14 @@ export function sseResponse(events: AsyncIterable<BaseEvent>, accept?: string): 
   const bytes = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      for await (const e of events) controller.enqueue(bytes.encode(encoder.encodeSSE(e)));
-      controller.close();
+      try {
+        for await (const e of events) controller.enqueue(bytes.encode(encoder.encodeSSE(e)));
+        controller.close();
+      } catch {
+        // Client disconnected: enqueue/close throws once the controller is errored or closed. The for-await
+        // loop's abrupt completion already called the events iterator's return(), so there is nothing left to
+        // clean up here beyond not letting the exception become an unhandled rejection.
+      }
     },
   });
   return new Response(stream, {

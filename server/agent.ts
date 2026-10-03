@@ -84,13 +84,18 @@ export function agentReply(ops: Database, sessionId: string, agentSessionId: str
   return true;
 }
 
-/** Closes the handoff and gives the conversation back to the assistant. */
+/**
+ * Closes the handoff and gives the conversation back to the assistant — but only reactivates the session when
+ * it is still `handed_off`. If the customer logged out (or otherwise left `handed_off`) while the agent held the
+ * case, resuming must not revive a revoked token into `active`.
+ */
 export function resolveSession(ops: Database, auth: Pick<Auth, "setStatus">, sessionId: string, agentSessionId: string, now = new Date()): boolean {
   if (!heldBy(ops, sessionId, agentSessionId)) return false;
   ops
     .query("update handoffs set status = 'resolved', resolved_at = ? where session_id = ? and status = 'taken'")
     .run(now.toISOString(), sessionId);
-  auth.setStatus(sessionId, "active");
+  const status = ops.query<{ status: string }, [string]>("select status from sessions where session_id = ?").get(sessionId)?.status;
+  if (status === "handed_off") auth.setStatus(sessionId, "active");
   appendAudit(ops, { sessionId, kind: "agent_resolve", payload: {} });
   return true;
 }

@@ -168,6 +168,21 @@ describe("agent console", () => {
     expect(after.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("LATAM Bank");
   });
 
+  test("agent resume after the customer logged out does not revive a revoked token", async () => {
+    const { login, run, agent, call } = await setup();
+    const s = await login();
+    await run(s.token, s.sessionId, say("Quiero hablar con un agente"));
+    const a = await agent();
+    expect((await call(`/api/agent/sessions/${s.sessionId}/take`, { method: "POST" }, a)).status).toBe(200);
+
+    expect((await call("/api/auth/logout", { method: "POST" }, s.token)).status).toBe(200);
+
+    expect((await call(`/api/agent/sessions/${s.sessionId}/resume`, { method: "POST" }, a)).status).toBe(200);
+
+    const after = await run(s.token, s.sessionId, say("hola"));
+    expect(after.status).toBe(401);
+  });
+
   test("customers cannot use agent routes or read other sessions' traces", async () => {
     const { login, call } = await setup();
     const s = await login();

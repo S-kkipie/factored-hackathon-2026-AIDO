@@ -30,7 +30,7 @@ const IDS: TemplateId[] = [
 describe("templates", () => {
   test.each(["es", "pt"] as const)("every %s template passes the response gate with its own facts", (lang) => {
     for (const id of IDS) {
-      const text = render(id, lang, { transactions: txs.slice(0, 2), dispute, handoffId: "H-0123456789AB" });
+      const text = render(id, lang, { transactions: txs.slice(0, 2), dispute, handoffId: "H-0123456789AB", reason: "incorrect_amount" });
       const facts = factsFrom(
         { transactions: val(txs, "db"), dispute: val(dispute, "db"), handoffId: val("H-0123456789AB", "db") },
         [text],
@@ -43,6 +43,15 @@ describe("templates", () => {
   test("dispute_created quotes the policy timeline and the case id", () => {
     expect(render("dispute_created", "es", { dispute })).toContain("D-ABCDEF123456");
     expect(render("dispute_created", "pt", { dispute })).toContain("10 dias úteis");
+  });
+
+  test("confirm_dispute names the reason the confirmation nonce is bound to", () => {
+    expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "unrecognized" })).toContain("cargo no reconocido");
+    expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "incorrect_amount" })).toContain("monto incorrecto");
+    expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "duplicate" })).toContain("cargo duplicado");
+    expect(render("confirm_dispute", "pt", { transactions: txs.slice(0, 1), reason: "unrecognized" })).toContain("cobrança não reconhecida");
+    expect(render("confirm_dispute", "pt", { transactions: txs.slice(0, 1), reason: "incorrect_amount" })).toContain("valor incorreto");
+    expect(render("confirm_dispute", "pt", { transactions: txs.slice(0, 1), reason: "duplicate" })).toContain("cobrança duplicada");
   });
 
   test("renderFacts output is grounded without templates", () => {
