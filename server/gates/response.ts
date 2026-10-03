@@ -21,12 +21,12 @@ const ID_PATTERN = /\b(?:CLI|PRD|TRX|CMP|D|H)-[A-Z0-9]{6,24}\b/g;
 const CURRENCY = String.raw`(?:US\$|R\$|\$|USD|MXN|COP|ARS|BRL)`;
 const WORDS = String.raw`(?:USD|MXN|COP|ARS|BRL|pesos|d[oó]lares|reais)`;
 const NUMBER = String.raw`(\d[\d.,]*\d|\d)`;
-const AMOUNT_PATTERN = new RegExp(String.raw`${CURRENCY}\s?${NUMBER}|${NUMBER}\s?${WORDS}`, "gi");
+const AMOUNT_PATTERN = new RegExp(String.raw`${CURRENCY}\s*${NUMBER}|${NUMBER}\s*${WORDS}`, "gi");
 const COMMITMENT =
-  /\b(reembols\w*|reintegr\w*|devolvemos|devolveremos|abonaremos|aprobad[oa]s?|aprobamos|garantiz\w*|estorn\w*|ressarc\w*|aprovad[oa]s?|aprovamos|garantim\w*)\b|\b(?:en|dentro de|em|até)\s+\d+\s+(?:d[ií]as|dias|horas)\b/i;
+  /\b(reembols\w*|reintegr\w*|devolv\w*|abon\w*|aprob\w*|aprov\w*|garantiz\w*|estorn\w*|ressarc\w*|garantim\w*)\b|\b(?:en|dentro de|em|até)\s+\d+\s+(?:d[ií]as|horas)\b/i;
 // Unicode-aware word boundaries: JavaScript's \b treats accented letters as non-word characters.
-const ES_MARKERS = /(?<!\p{L})(?:el|los|las|usted|está|cuenta|cargo|puedo|gracias|sí|su|del)(?!\p{L})|ñ|¿|¡/giu;
-const PT_MARKERS = /(?<!\p{L})(?:você|não|sua|seu|conta|cobrança|posso|obrigad[oa]|é|do|da)(?!\p{L})|ção|ções|ã|õ/giu;
+const ES_MARKERS = /(?<!\p{L})(?:el|los|las|usted|cuenta|cargo|puedo|gracias|sí|su|del|ya|eso|esto|son|también|fue)(?!\p{L})|ñ|¿|¡/giu;
+const PT_MARKERS = /(?<!\p{L})(?:você|não|sua|seu|conta|cobrança|posso|obrigad[oa]|é|do|da|já|isso|isto|são|também|nós|foi)(?!\p{L})|ção|ções|ã|õ/giu;
 
 /** Parses "1.234,56", "1,234.56", "45.00", "1.234" (thousands) into a number. */
 export function parseAmount(raw: string): number {

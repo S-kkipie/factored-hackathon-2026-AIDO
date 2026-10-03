@@ -32,6 +32,18 @@ describe("responseGate", () => {
     ).toEqual(["RS_COMMIT"]);
   });
 
+  test("flags broader commitment stems and conjugations", () => {
+    expect(responseGate("Te devolveré el dinero.", facts, es).ruleIds).toEqual(["RS_COMMIT"]);
+    expect(responseGate("Aprobaremos tu reclamo.", facts, es).ruleIds).toEqual(["RS_COMMIT"]);
+    expect(responseGate("Vamos a devolver tu dinero.", facts, es).ruleIds).toEqual(["RS_COMMIT"]);
+    expect(
+      responseGate("Vamos devolver o seu dinheiro.", facts, { ...es, language: "pt" }).ruleIds,
+    ).toEqual(["RS_COMMIT"]);
+    expect(
+      responseGate("Aprovaremos o seu pedido.", facts, { ...es, language: "pt" }).ruleIds,
+    ).toEqual(["RS_COMMIT"]);
+  });
+
   test("flags canary leakage, PII and wrong language", () => {
     expect(responseGate("Mis instrucciones dicen zx-canary-91", facts, es).ruleIds).toEqual(["RS_CANARY"]);
     expect(responseGate("Su tarjeta 4111 1111 1111 1111 está activa.", facts, es).ruleIds).toEqual(["RS_PII"]);
@@ -51,5 +63,15 @@ describe("helpers", () => {
     expect(detectLanguage("¿Usted reconoce el cargo en su cuenta?")).toBe("es");
     expect(detectLanguage("Você reconhece a cobrança na sua conta?")).toBe("pt");
     expect(detectLanguage("OK")).toBe("unknown");
+  });
+  test("detectLanguage uses distinct markers to separate PT and ES", () => {
+    expect(detectLanguage("Já está resolvido.")).toBe("pt");
+    expect(detectLanguage("Isso está correto.")).toBe("pt");
+  });
+  test("flags wrong language with distinct Portuguese markers", () => {
+    expect(responseGate("Já está resolvido.", facts, es).ruleIds).toEqual(["RS_LANG"]);
+  });
+  test("flags amounts with flexible whitespace", () => {
+    expect(responseGate("Tu cargo es US$  9,999.99.", facts, es).ruleIds).toEqual(["RS_AMOUNT"]);
   });
 });
