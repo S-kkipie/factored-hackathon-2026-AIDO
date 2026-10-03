@@ -50,7 +50,7 @@ export async function assessTable(duck: Duck, contract: Contract): Promise<Table
   );
 
   let lagDays: TableQuality["lagDays"] = null;
-  if (contract.eventTime && contract.processDate) {
+  if (stagedRows > 0 && contract.eventTime && contract.processDate) {
     const lag = `datediff('day', cast(${ident(contract.eventTime)} as date), ${ident(contract.processDate)})`;
     lagDays = await duck.one<{ avg: number; min: number; max: number }>(
       `select round(avg(${lag}), 2) as avg, min(${lag})::integer as min, max(${lag})::integer as max from ${table}`,

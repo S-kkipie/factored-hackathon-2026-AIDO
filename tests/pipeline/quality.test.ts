@@ -5,7 +5,7 @@ import { customers, products, transactions } from "../../pipeline/contracts";
 import { openDuck } from "../../pipeline/duck";
 import { buildMarts, renderDemandMarkdown } from "../../pipeline/marts";
 import { assessTable, renderQualityMarkdown } from "../../pipeline/quality";
-import { ensureStagingSchema } from "../../pipeline/stage";
+import { ensureStagingSchema, stageTable } from "../../pipeline/stage";
 import { makeWorkspace, stageAll } from "./helpers";
 
 async function staged() {
@@ -41,6 +41,23 @@ describe("assessTable", () => {
     expect(md).toContain("Run: `run-x`");
     expect(md).toContain("## customers");
     expect(md).toContain("| enum:segment | 1 |");
+    duck.close();
+  });
+
+  test("handles empty tables without null lag stats", async () => {
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+    await stageTable(duck, customers, [], "/tmp", "load-1");
+    await stageTable(duck, products, [], "/tmp", "load-1");
+    await stageTable(duck, transactions, [], "/tmp", "load-1");
+    const q = await assessTable(duck, transactions);
+    expect(q).toMatchObject({
+      table: "transactions",
+      stagedRows: 0,
+      lagDays: null,
+    });
+    const md = renderQualityMarkdown([q], [], "r");
+    expect(md).not.toContain("Arrival lag");
     duck.close();
   });
 });
