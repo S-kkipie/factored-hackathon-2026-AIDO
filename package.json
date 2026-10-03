@@ -5,6 +5,9 @@
   "scripts": {
     "download": "bun pipeline/download.ts",
     "pipeline": "bun pipeline/run.ts",
+    "publish": "bun pipeline/publish.ts",
+    "seed:demo": "bun pipeline/demo.ts",
+    "db:push": "supabase db push",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "dev": "bun --watch server/main.ts",
