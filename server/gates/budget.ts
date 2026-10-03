@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { BUDGETS, type Budgets } from "../policy/config";
 
-export type BudgetRule = "BUD_TURNS" | "BUD_TOKENS" | "BUD_SPEND";
+export type BudgetRule = "BUD_TURNS" | "BUD_TOKENS" | "BUD_SPEND" | "BUD_SESSION";
 
 export function checkBudget(
   ops: Database,
@@ -12,19 +12,22 @@ export function checkBudget(
   const s = ops
     .query<{ turns: number; tokens: number }, [string]>("select turns, tokens from sessions where session_id = ?")
     .get(sessionId);
-  if (s && s.turns >= budgets.maxTurns) return { ok: false, ruleId: "BUD_TURNS" };
-  if (s && s.tokens >= budgets.maxTokensPerSession) return { ok: false, ruleId: "BUD_TOKENS" };
+  if (!s) return { ok: false, ruleId: "BUD_SESSION" };
+  if (s.turns >= budgets.maxTurns) return { ok: false, ruleId: "BUD_TURNS" };
+  if (s.tokens >= budgets.maxTokensPerSession) return { ok: false, ruleId: "BUD_TOKENS" };
   const spent = ops.query<{ usd: number }, [string]>("select usd from spend where day = ?").get(day)?.usd ?? 0;
   if (spent >= budgets.dailySpendUsd) return { ok: false, ruleId: "BUD_SPEND" };
   return { ok: true };
 }
 
 export function recordTurn(ops: Database, sessionId: string): void {
-  ops.query("update sessions set turns = turns + 1 where session_id = ?").run(sessionId);
+  const changed = ops.query("update sessions set turns = turns + 1 where session_id = ?").run(sessionId).changes;
+  if (changed === 0) throw new Error(`BUD_SESSION: unknown session ${sessionId}`);
 }
 
 export function recordUsage(ops: Database, sessionId: string, day: string, tokens: number, usd: number): void {
-  ops.query("update sessions set tokens = tokens + ? where session_id = ?").run(tokens, sessionId);
+  const changed = ops.query("update sessions set tokens = tokens + ? where session_id = ?").run(tokens, sessionId).changes;
+  if (changed === 0) throw new Error(`BUD_SESSION: unknown session ${sessionId}`);
   ops
     .query("insert into spend (day, usd) values (?, ?) on conflict (day) do update set usd = usd + excluded.usd")
     .run(day, usd);

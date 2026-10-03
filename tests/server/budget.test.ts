@@ -53,6 +53,37 @@ describe("budgets", () => {
     b.success();
     expect(b.state).toBe("closed");
   });
+
+  test("fails closed for missing sessions", () => {
+    const ops = makeOps();
+    expect(checkBudget(ops, "ghost", "2026-10-02", small)).toEqual({ ok: false, ruleId: "BUD_SESSION" });
+  });
+
+  test("recordTurn throws on missing session", () => {
+    const ops = makeOps();
+    expect(() => recordTurn(ops, "ghost")).toThrow("BUD_SESSION: unknown session ghost");
+  });
+
+  test("recordUsage throws on missing session and doesn't upsert spend", () => {
+    const ops = makeOps();
+    expect(() => recordUsage(ops, "ghost", "2026-10-02", 1, 0.1)).toThrow("BUD_SESSION: unknown session ghost");
+    const spent = ops.query<{ usd: number }, [string]>("select usd from spend where day = ?").get("2026-10-02");
+    expect(spent).toBeFalsy();
+  });
+
+  test("circuit breaker returns to open after failure in half_open state", () => {
+    let now = 0;
+    const b = new CircuitBreaker({ failureThreshold: 2, cooldownMs: 1000, now: () => now });
+    b.failure();
+    b.failure();
+    expect(b.state).toBe("open");
+    now = 1001;
+    b.canCall(); // transitions to half_open
+    expect(b.state).toBe("half_open");
+    b.failure(); // failure in half_open returns to open
+    expect(b.state).toBe("open");
+    expect(b.canCall()).toBe(false);
+  });
 });
 
 describe("risk score", () => {
