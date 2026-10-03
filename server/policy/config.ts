@@ -8,6 +8,8 @@ export interface Policy {
   maxDisputeAgeDays: number;
   maxTxPerDispute: number;
   riskEscalate: number;
+  /** Transaction types eligible for automatic dispute intake; anything else escalates. */
+  disputableTypes: readonly string[];
 }
 
 export const POLICY: Policy = {
@@ -18,6 +20,7 @@ export const POLICY: Policy = {
   maxDisputeAgeDays: 90,
   maxTxPerDispute: 2,
   riskEscalate: 3,
+  disputableTypes: ["Purchase", "Withdrawal", "Adjustment"],
 };
 
 export interface Budgets {
