@@ -36,7 +36,7 @@ S034,es,MX,explain_charge,ayúdame a identificar un cargo de 64 dólares del vie
 S035,es,CO,explain_charge,¿por qué un cobro sale en dólares si compré en pesos?,es-exp-6
 S036,es,AR,explain_charge,quiero saber por qué una compra figura como hecha en el exterior,es-exp-6
 S037,es,MX,dispute_charge,hay un cargo en mi tarjeta que yo nunca hice,es-dsp-1
-S038,es,AR,dispute_charge,fijate que no reconozco esa compra, yo no la hice,es-dsp-1
+S038,es,AR,dispute_charge,"fijate que no reconozco esa compra, yo no la hice",es-dsp-1
 S039,es,CO,dispute_charge,me cobraron doble el mismo pedido de comida,es-dsp-2
 S040,es,MX,dispute_charge,"aparece repetido el cargo de la gasolinera, me lo cobraron dos veces",es-dsp-2
 S041,es,AR,dispute_charge,el monto que me debitaron no es el que pagué,es-dsp-3
@@ -45,13 +45,13 @@ S043,es,MX,dispute_charge,quiero levantar una aclaración por un cargo no recono
 S044,es,AR,dispute_charge,quiero iniciar un reclamo por un consumo que no reconozco,es-dsp-4
 S045,es,CO,dispute_charge,"creo que clonaron mi tarjeta, hay compras que no son mías",es-dsp-5
 S046,es,MX,dispute_charge,"alguien hizo compras en línea con mis datos, no fui yo",es-dsp-5
-S047,es,AR,dispute_charge,el cargo TRX-9QZ1B2C3D4E5F6G7H8J9K0 no lo hice yo, abrime un reclamo,es-dsp-6
+S047,es,AR,dispute_charge,"el cargo TRX-9QZ1B2C3D4E5F6G7H8J9K0 no lo hice yo, abrime un reclamo",es-dsp-6
 S048,es,CO,dispute_charge,disputar el movimiento TRX-7MN4P5Q6R7S8T9U0V1W2X3 por favor,es-dsp-6
 S049,es,MX,request_human,"comunícame con un asesor, por favor",es-hum-1
 S050,es,AR,request_human,quiero que me atienda un representante,es-hum-1
 S051,es,CO,request_human,"no me está entendiendo, quiero hablar con una persona",es-hum-2
 S052,es,MX,request_human,"esto no me sirve, pásame con alguien real",es-hum-2
-S053,es,AR,request_human,pasame con un operador humano, es urgente,es-hum-3
+S053,es,AR,request_human,"pasame con un operador humano, es urgente",es-hum-3
 S054,es,CO,request_human,"deme un agente ya, es una emergencia",es-hum-3
 S055,es,MX,request_human,¿hay algún ejecutivo disponible?,es-hum-4
 S056,es,AR,request_human,"¿me puede llamar alguien del banco? tengo un problema, che",es-hum-4
@@ -129,7 +129,7 @@ S127,pt,BR,dispute_charge,quero abrir uma contestação de compra não reconheci
 S128,pt,BR,dispute_charge,quero registrar uma reclamação de uma compra que não reconheço,pt-dsp-4
 S129,pt,BR,dispute_charge,"acho que clonaram meu cartão, tem compras que não são minhas",pt-dsp-5
 S130,pt,BR,dispute_charge,"alguém fez compras online com meus dados, não fui eu",pt-dsp-5
-S131,pt,BR,dispute_charge,a cobrança TRX-9QZ1B2C3D4E5F6G7H8J9K0 não fui eu que fiz, abram uma contestação,pt-dsp-6
+S131,pt,BR,dispute_charge,"a cobrança TRX-9QZ1B2C3D4E5F6G7H8J9K0 não fui eu que fiz, abram uma contestação",pt-dsp-6
 S132,pt,BR,dispute_charge,contestar o lançamento TRX-7MN4P5Q6R7S8T9U0V1W2X3 por favor,pt-dsp-6
 S133,pt,BR,request_human,"me conecta com um atendente, por favor",pt-hum-1
 S134,pt,BR,request_human,quero ser atendido por um representante,pt-hum-1
