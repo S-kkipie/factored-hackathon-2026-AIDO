@@ -131,6 +131,12 @@ bun test
 
 The dataset and the derived `serving.sqlite` are distributed to participants only. They are never committed to this public repository.
 
+Pipeline outputs:
+- `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
+- `data/marts/*.parquet`: demand evidence.
+- `reports/quality.md`, `reports/demand.md`: data quality and demand reports (committed).
+- `data/runs/<run_id>/manifest.json`: lineage (input fingerprints, per-stage counts, output hash).
+
 ## Roadmap
 
 | Plan | Scope | Status |
