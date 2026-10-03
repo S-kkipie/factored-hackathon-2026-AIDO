@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { rm, rename } from "node:fs/promises";
 import type { PipelineConfig } from "./config";
 import type { Duck } from "./duck";
 import { lit } from "./sql";
@@ -71,8 +71,20 @@ export async function curate(duck: Duck, o: CurateOptions): Promise<CurateResult
     union
     select customer_id from _personas`);
 
-  await rm(o.servingPath, { force: true });
-  await duck.run(`install sqlite; load sqlite; attach ${lit(o.servingPath)} as srv (type sqlite)`);
+  // Validate that all personas are present before building serving.sqlite
+  const personaRows = await duck.all<{ persona: Persona; customer_id: string }>(
+    "select distinct persona, customer_id from _personas order by persona",
+  );
+  const presentPersonas = new Set(personaRows.map((r) => r.persona));
+  const allPersonas: Persona[] = ["fraud_suspect", "high_amount", "normal", "repeat_complainer", "suspended"];
+  const missingPersonas = allPersonas.filter((p) => !presentPersonas.has(p));
+  if (missingPersonas.length > 0) {
+    throw new Error(`missing demo personas: ${missingPersonas.join(", ")}`);
+  }
+
+  const tmpPath = `${o.servingPath}.tmp`;
+  await rm(tmpPath, { force: true });
+  await duck.run(`install sqlite; load sqlite; attach ${lit(tmpPath)} as srv (type sqlite)`);
   try {
     const inSubset = "customer_id in (select customer_id from _subset)";
     await duck.run(`
@@ -103,14 +115,19 @@ export async function curate(duck: Duck, o: CurateOptions): Promise<CurateResult
     const counts = await duck.one<{ customers: number; transactions: number }>(`select
       (select count(*)::integer from srv.customers) as customers,
       (select count(*)::integer from srv.transactions) as transactions`);
-    const personaRows = await duck.all<{ persona: Persona; customer_id: string }>(
-      "select persona, customer_id from _personas order by persona",
-    );
+    await duck.run("detach srv");
+    await rename(tmpPath, o.servingPath);
     return {
       ...counts,
       personas: Object.fromEntries(personaRows.map((r) => [r.persona, r.customer_id])) as Record<Persona, string>,
     };
-  } finally {
-    await duck.run("detach srv");
+  } catch (err) {
+    try {
+      await duck.run("detach srv");
+    } catch {
+      // already detached or not attached
+    }
+    await rm(tmpPath, { force: true });
+    throw err;
   }
 }

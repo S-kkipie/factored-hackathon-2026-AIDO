@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { curate } from "../../pipeline/curate";
@@ -34,6 +35,9 @@ describe("curate", () => {
     expect(customerColumns).not.toContain("document_type");
     expect(customerColumns).not.toContain("document_number");
 
+    const transactionColumns = db.query<{ name: string }, []>("pragma table_info(transactions)").all().map((r) => r.name);
+    expect(transactionColumns).not.toContain("is_fraud");
+
     expect(db.query("select product_number_masked as m from products where product_id = 'P1'").get()).toEqual({
       m: "****1111",
     });
@@ -42,5 +46,19 @@ describe("curate", () => {
     });
     expect(db.query("select value from meta where key = 'clock'").get()).toEqual({ value: "2026-06-17" });
     db.close();
+  });
+
+  test("rejects if any persona is missing", async () => {
+    const config = await makeWorkspace();
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+    await stageAll(duck, config, "load-1");
+    await duck.run("update stg.customers set customer_status = 'Active' where customer_status = 'Suspended'");
+
+    await expect(curate(duck, config)).rejects.toThrow("missing demo personas: suspended");
+    duck.close();
+
+    expect(existsSync(config.servingPath)).toBe(false);
+    expect(existsSync(`${config.servingPath}.tmp`)).toBe(false);
   });
 });
