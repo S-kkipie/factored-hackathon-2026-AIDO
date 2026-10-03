@@ -142,14 +142,20 @@ bun run smoke                                # scripted ES/PT turns over data/se
 
 | Route | Purpose |
 |---|---|
+| `GET /api/health` | Liveness check |
+| `GET /api/demo-users` | Demo personas available to log in as |
 | `POST /api/auth/login` | Demo login `{persona, pin, language}` → JWT (15 min) |
+| `POST /api/auth/logout` | Ends the caller's own session; its token stops verifying immediately |
 | `POST /api/agui/run` | AG-UI `RunAgentInput` → SSE events; `threadId` must be the session id |
 | `GET /api/chat/messages` | Agent replies for a handed-off customer |
 | `POST /api/auth/agent` | Agent login |
 | `GET /api/agent/queue`, `POST /api/agent/sessions/:id/{take,reply,resume}` | Agent console |
+| `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
 
-Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`.
+Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`.
+
+**Limits:** the per-session lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are in-process state — run a single instance (e.g. Cloud Run `--max-instances=1`); that state (and the SQLite-backed sessions, checkpoints and queue) is lost on restart. The production path is Postgres/Redis for this state (see [Known limitations](#known-limitations)). `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
 
 Pipeline outputs:
 - `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
