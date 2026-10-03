@@ -44,7 +44,7 @@ export function createGeminiRouter(llm: Llm): Router {
           ZeroShotSchema,
           () =>
             llm
-              .generate({ ...zeroShotPrompt(text), json: true, maxOutputTokens: 300, signal: AbortSignal.timeout(15_000) })
+              .generate({ ...zeroShotPrompt(text), json: true, maxOutputTokens: 800, signal: AbortSignal.timeout(15_000) })
               .then((r) => r.text),
           1,
         );

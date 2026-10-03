@@ -66,18 +66,46 @@ result.runId = `router-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 mkdirSync(join(ROOT, "experiments"), { recursive: true });
 mkdirSync(join(ROOT, "ml/models"), { recursive: true });
 const { model, ...summary } = result;
+const generatorMetaPath = join(ROOT, "ml/data/router-train.meta.json");
+const generatorMetaFile = Bun.file(generatorMetaPath);
+const generatorMeta = (await generatorMetaFile.exists()) ? JSON.parse(await generatorMetaFile.text()) : null;
+const gitSha = (() => {
+  try {
+    const res = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: ROOT });
+    return res.success ? res.stdout.toString().trim() : "unknown";
+  } catch {
+    return "unknown";
+  }
+})();
 await atomicWrite(
   join(ROOT, "experiments", `${result.runId}.json`),
   `${JSON.stringify(
-    { ...summary, spentUsd: budget.spent(), embedModel: embedder.model, chatModel: cfg.geminiModel, zeroShotPromptVersion: ZERO_SHOT_PROMPT_VERSION },
+    {
+      ...summary,
+      spentUsd: budget.spent(),
+      embedModel: embedder.model,
+      chatModel: cfg.geminiModel,
+      zeroShotPromptVersion: ZERO_SHOT_PROMPT_VERSION,
+      generatorMeta,
+      gitSha,
+    },
     null,
     2,
   )}\n`,
 );
-await atomicWrite(join(ROOT, "ml/models/router-embed-lr.json"), `${JSON.stringify({ version: EMBED_LR_VERSION, runId: result.runId, ...model })}\n`);
+const embedLrResult = result.routers.find((r) => r.name === "embed-lr");
+const selectedResult = result.routers.find((r) => r.name === result.selected.router);
+await atomicWrite(
+  join(ROOT, "ml/models/router-embed-lr.json"),
+  `${JSON.stringify({ version: EMBED_LR_VERSION, runId: result.runId, threshold: embedLrResult?.threshold, ...model })}\n`,
+);
 await atomicWrite(
   join(ROOT, "ml/models/router-selection.json"),
-  `${JSON.stringify({ router: result.selected.router, runId: result.runId, rationale: result.selected.rationale }, null, 2)}\n`,
+  `${JSON.stringify(
+    { router: result.selected.router, runId: result.runId, rationale: result.selected.rationale, threshold: selectedResult?.threshold },
+    null,
+    2,
+  )}\n`,
 );
 await atomicWrite(
   join(ROOT, "reports/router.md"),

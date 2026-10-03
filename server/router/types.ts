@@ -6,9 +6,11 @@ export type RouteLabel = Intent | "greeting";
 
 export interface RouteResult {
   label: RouteLabel;
-  /** Calibrated confidence in [0, 1]; below POLICY.routerThreshold the graph clarifies. */
+  /** Calibrated confidence in [0, 1]; below the routing threshold the graph clarifies. */
   confidence: number;
   router: string;
+  /** This router's own dev-chosen threshold (ml/train.ts); falls back to POLICY.routerThreshold when absent. */
+  threshold?: number;
 }
 
 /** One interface for every router compared in plan 3 (keyword, Gemini zero-shot, embeddings + LR, Jev). */

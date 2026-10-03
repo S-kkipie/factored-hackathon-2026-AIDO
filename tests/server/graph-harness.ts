@@ -10,6 +10,7 @@ import { POLICY } from "../../server/policy/config";
 import { type TurnDeps, type TurnEvent, canaryFor, resumeTurn, runTurn } from "../../server/graph/turn";
 import type { Llm } from "../../server/llm/types";
 import { createKeywordRouter } from "../../server/router/keyword";
+import type { Router } from "../../server/router/types";
 import { Tracer } from "../../server/trace";
 import { createTools, type Tools } from "../../server/tools";
 import { makeOps, makeServing } from "./fixtures";
@@ -44,6 +45,8 @@ export interface HarnessOptions {
   seedServingSql?: string;
   /** Wraps the real tools, for tests that need one tool call to fail in a controlled way. */
   tools?: (real: Tools) => Tools;
+  /** Overrides the default keyword router, for tests that need to control routing decisions directly. */
+  router?: Router;
 }
 
 /** A logged-in customer with real tools, policy, router, checkpointer and audit; only the model is scripted. */
@@ -66,7 +69,7 @@ export async function harness(o: HarnessOptions = {}) {
     ops,
     tools: o.tools ? o.tools(realTools) : realTools,
     auth,
-    router: createKeywordRouter(),
+    router: o.router ?? createKeywordRouter(),
     llm,
     breaker: new CircuitBreaker({ failureThreshold: 3, cooldownMs: 60_000 }),
     checkpointer: new BunSqliteSaver(ops),

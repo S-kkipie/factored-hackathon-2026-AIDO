@@ -1,7 +1,9 @@
 import { Command } from "@langchain/langgraph";
 import { describe, expect, test } from "bun:test";
+import { SpendCapError } from "../../server/llm/metered";
 import { render } from "../../server/policy/templates";
 import { listSpans } from "../../server/trace";
+import type { Router } from "../../server/router/types";
 import { ToolError } from "../../server/tools/runtime";
 import { drive, type TurnDeps, type TurnEvent } from "../../server/graph/turn";
 import { FIXTURE } from "./fixtures";
@@ -347,6 +349,42 @@ describe("escalation and safety", () => {
   test("Portuguese sessions get Portuguese templates", async () => {
     const h = await harness({ language: "pt" });
     expect(messageOf(await h.send("Quero um empréstimo"))).toContain("fora do que posso atender");
+  });
+});
+
+describe("router threshold and spend-cap fallback", () => {
+  test("a router-supplied threshold overrides POLICY.routerThreshold: confidence 0.8 below threshold 0.9 clarifies", async () => {
+    const router: Router = {
+      name: "stub",
+      route: async () => ({ label: "check_balance", confidence: 0.8, threshold: 0.9, router: "stub" }),
+    };
+    const h = await harness({ router });
+    const ev = await h.send("¿Cuál es mi saldo?");
+    expect(doneOf(ev).outcome).toBe("clarify");
+    expect(doneOf(ev).ruleIds).toContain("RT_LOW_CONFIDENCE");
+  });
+
+  test("without a router-supplied threshold, POLICY.routerThreshold still applies", async () => {
+    const router: Router = {
+      name: "stub",
+      route: async () => ({ label: "check_balance", confidence: 0.7, router: "stub" }),
+    };
+    const h = await harness({ router, script: byPurpose({}, "Su tarjeta PRD-A1 tiene un saldo de 1200.50 USD.") });
+    const ev = await h.send("¿Cuál es mi saldo?");
+    expect(doneOf(ev).outcome).toBe("answered");
+  });
+
+  test("a SpendCapError from the router falls back to the keyword baseline for this turn instead of a 500", async () => {
+    const router: Router = {
+      name: "stub",
+      route: async () => {
+        throw new SpendCapError("run limit of $0.5 reached");
+      },
+    };
+    const h = await harness({ router, script: byPurpose({}, "Su tarjeta PRD-A1 tiene un saldo de 1200.50 USD.") });
+    const ev = await h.send("¿Cuál es mi saldo?");
+    expect(doneOf(ev).ruleIds).toContain("BUD_TOTAL");
+    expect(doneOf(ev).outcome).toBe("answered");
   });
 });
 

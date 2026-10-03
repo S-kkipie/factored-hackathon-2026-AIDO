@@ -3,11 +3,14 @@ import { getRisk, addRisk } from "../gates/risk";
 import { responseGate } from "../gates/response";
 import { withSchema } from "../gates/schema";
 import { ModelUnavailable } from "../llm/gateway";
+import { SpendCapError } from "../llm/metered";
 import { extractSlotsPrompt, respondPrompt } from "../llm/prompts";
 import { POLICY } from "../policy/config";
 import { type Intent, decide } from "../policy/rules";
 import { render, renderFacts } from "../policy/templates";
 import { val } from "../provenance";
+import { createKeywordRouter } from "../router/keyword";
+import type { RouteResult } from "../router/types";
 import type { RuleId } from "../rules";
 import { ToolError, runTool } from "../tools/runtime";
 import { toModelProduct, toModelTransaction } from "../tools/views";
@@ -23,15 +26,27 @@ const intentOf = (s: TurnValues): Intent => {
 
 const nextDay = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
-/** Gate 2: router + calibrated confidence; injection signals raise session risk but never decide alone. */
+/**
+ * Gate 2: router + calibrated confidence; injection signals raise session risk but never decide alone. A
+ * SpendCapError from the configured router (its embedding call could cross the spend cap) falls back to the
+ * keyword baseline for this turn only, so the turn still completes instead of failing with a 500.
+ */
 export const routerNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
-  const route = await d.router.route(s.message, s.language);
+  let route: RouteResult;
   const rules: RuleId[] = [];
+  try {
+    route = await d.router.route(s.message, s.language);
+  } catch (e) {
+    if (!(e instanceof SpendCapError)) throw e;
+    route = await createKeywordRouter().route(s.message, s.language);
+    rules.push("BUD_TOTAL");
+  }
   if (s.injection) {
     addRisk(d.ops, d.sessionId, "injectionSignal");
     rules.push("IN_INJECTION");
   }
-  if (route.label !== "greeting" && route.confidence < POLICY.routerThreshold) rules.push("RT_LOW_CONFIDENCE");
+  const threshold = route.threshold ?? POLICY.routerThreshold;
+  if (route.label !== "greeting" && route.confidence < threshold) rules.push("RT_LOW_CONFIDENCE");
   else if (route.label === "out_of_scope") rules.push("RT_OUT_OF_SCOPE");
   audit(d, "route", rules, { label: route.label, confidence: route.confidence, router: route.router });
   return { route, ruleIds: addRules(s.ruleIds, ...rules) };
@@ -41,7 +56,7 @@ export const afterRouter = (s: TurnValues): string => {
   const r = s.route;
   if (!r) return "clarify";
   if (r.label === "greeting") return "greet";
-  if (r.confidence < POLICY.routerThreshold) return "clarify";
+  if (r.confidence < (r.threshold ?? POLICY.routerThreshold)) return "clarify";
   if (r.label === "out_of_scope") return "abstain";
   if (r.label === "request_human") return "policy";
   return "extract";

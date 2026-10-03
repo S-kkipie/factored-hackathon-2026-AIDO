@@ -57,4 +57,34 @@ describe("runtime router selection", () => {
     expect(() => createConfiguredRouter({ choice: "auto", ...files({ router: "gemini-zeroshot" }), embedder: null })).toThrow("unknown selected router");
     expect(() => createConfiguredRouter({ choice: "embed-lr", ...files(undefined, { bad: 1 }), embedder: fakeEmbedder(8) })).toThrow("schema");
   });
+
+  test("the selection file's threshold is attached to every result of the chosen router", async () => {
+    const r = createConfiguredRouter({
+      choice: "auto",
+      ...files({ router: "embed-lr", runId: "run-1", threshold: 0.73 }, model(8)),
+      embedder: fakeEmbedder(8),
+    });
+    const result = await r.router.route("hola", "es");
+    expect(result.threshold).toBe(0.73);
+  });
+
+  test("falling back to keyword because embed-lr is unavailable does not leak embed-lr's threshold", async () => {
+    const r = createConfiguredRouter({
+      choice: "auto",
+      ...files({ router: "embed-lr", runId: "run-1", threshold: 0.73 }, model(8)),
+      embedder: null,
+    });
+    const result = await r.router.route("hola", "es");
+    expect(result.threshold).toBeUndefined();
+  });
+
+  test("an explicit ROUTER=embed-lr override uses the model file's own threshold, not the selection file's", async () => {
+    const r = createConfiguredRouter({
+      choice: "embed-lr",
+      ...files({ router: "keyword", runId: "run-1", threshold: 0.1 }, { ...model(8), threshold: 0.42 }),
+      embedder: fakeEmbedder(8),
+    });
+    const result = await r.router.route("hola", "es");
+    expect(result.threshold).toBe(0.42);
+  });
 });
