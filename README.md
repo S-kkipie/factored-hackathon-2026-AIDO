@@ -153,7 +153,7 @@ bun run smoke                                # scripted ES/PT turns over data/se
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
 
-Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`.
+Optional env: `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH`, `OPS_PATH`, `LLM_TOTAL_CAP_USD` (default `3`: hard cap on total project LLM spend), `SPEND_LEDGER_PATH` (default `data/spend-ledger.sqlite`, shared by the server, smoke and later eval/ML scripts; calls that could cross the cap are refused with `BUD_TOTAL` and the turn falls back to templates or a handoff).
 
 **Limits:** the per-session lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are in-process state — run a single instance (e.g. Cloud Run `--max-instances=1`); that state (and the SQLite-backed sessions, checkpoints and queue) is lost on restart. The production path is Postgres/Redis for this state (see [Known limitations](#known-limitations)). `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
 

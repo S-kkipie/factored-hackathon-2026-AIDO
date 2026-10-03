@@ -25,8 +25,9 @@ const env: Record<string, string | undefined> = {
   JWT_SECRET: process.env.JWT_SECRET ?? "smoke-secret-smoke-secret-smoke-secret",
   OPS_PATH: join(mkdtempSync(join(tmpdir(), "aido-smoke-")), "ops.sqlite"),
 };
-const { app, llm } = createServer(env);
-console.log(`model: ${llm?.model ?? "none"}`);
+const { app, llm, ledger } = createServer(env);
+const spentBefore = ledger.total();
+console.log(`model: ${llm?.model ?? "none"} · project LLM spend so far $${spentBefore.toFixed(4)} of $${ledger.capUsd}`);
 
 for (const [persona, language, text] of TURNS) {
   const login = await app.handle(
@@ -56,3 +57,5 @@ for (const [persona, language, text] of TURNS) {
   console.log(`  outcome=${String(get("/outcome"))} rules=${JSON.stringify(get("/ruleIds"))} run=${finished?.type}`);
   console.log(`  ${(reply || finished?.interrupts?.[0]?.message || "").replace(/\n/g, "\n  ")}`);
 }
+
+console.log(`\nthis run: $${(ledger.total() - spentBefore).toFixed(4)} · project total $${ledger.total().toFixed(4)} of $${ledger.capUsd}`);

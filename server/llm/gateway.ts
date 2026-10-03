@@ -5,6 +5,7 @@ import type { RuleIdWithPrefix } from "../rules";
 import type { Tracer } from "../trace";
 import type { PromptId } from "./prompts";
 import { PROMPT_VERSIONS } from "./prompts";
+import type { SpendLedger } from "./ledger";
 import { type Llm, costUsd } from "./types";
 
 export type ModelRule = RuleIdWithPrefix<"BUD">;
@@ -32,6 +33,8 @@ export interface GatewayDeps {
   day: string;
   timeoutMs: number;
   budgets?: Budgets;
+  /** Project-wide hard cap on total LLM spend; checked with a worst-case estimate before every call. */
+  ledger?: SpendLedger;
 }
 
 export interface ModelCall {
@@ -46,7 +49,7 @@ export interface ModelGateway {
 }
 
 /**
- * Gate 1b around every model call, in order: SAFE_MODE → session/daily budgets → circuit breaker → per-turn call
+ * Gate 1b around every model call, in order: SAFE_MODE → session/daily budgets → project spend cap → circuit breaker → per-turn call
  * counter → call with a hard timeout (AbortSignal) → usage and spend accounting → span.
  */
 export function createGateway(d: GatewayDeps): ModelGateway {
@@ -56,6 +59,11 @@ export function createGateway(d: GatewayDeps): ModelGateway {
       const llm = d.llm;
       const budget = checkBudget(d.ops, d.sessionId, d.day, d.budgets ?? BUDGETS);
       if (!budget.ok) throw new ModelUnavailable(budget.ruleId, "budget exhausted");
+      if (d.ledger) {
+        // Worst case: ~3 characters per input token, and the full output budget (thinking counts as output).
+        const estimate = costUsd(llm.model, Math.ceil((req.system.length + req.user.length) / 3), req.maxOutputTokens);
+        if (!d.ledger.allows(estimate)) throw new ModelUnavailable("BUD_TOTAL", "project LLM spend cap reached");
+      }
       if (!d.breaker.canCall()) throw new ModelUnavailable("BUD_BREAKER", "provider circuit is open");
       try {
         d.counter.take();
@@ -84,6 +92,7 @@ export function createGateway(d: GatewayDeps): ModelGateway {
           d.breaker.success();
           const usd = costUsd(res.model, res.inputTokens, res.outputTokens);
           recordUsage(d.ops, d.sessionId, d.day, res.inputTokens + res.outputTokens, usd);
+          d.ledger?.record(usd, { model: res.model, purpose, source: "server" });
           set("gen_ai.response.model", res.model);
           set("gen_ai.usage.input_tokens", res.inputTokens);
           set("gen_ai.usage.output_tokens", res.outputTokens);

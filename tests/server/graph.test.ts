@@ -301,6 +301,24 @@ describe("escalation and safety", () => {
     expect(h.status()).toBe("handed_off");
   });
 
+  test("a repeated budget escalation after the agent resolved the previous one queues a new handoff", async () => {
+    const h = await harness();
+    h.ops.query("update sessions set tokens = 40000").run();
+    expect(doneOf(await h.send("hola")).outcome).toBe("handoff");
+    const resolveAll = () => {
+      h.ops.query("update handoffs set status = 'resolved' where session_id = ?").run(h.sessionId);
+      h.ops.query("update sessions set status = 'active' where session_id = ?").run(h.sessionId);
+    };
+    resolveAll();
+    const again = await h.send("hola");
+    expect(doneOf(again).outcome).toBe("handoff");
+    const rows = h.ops
+      .query<{ status: string }, [string]>("select status from handoffs where session_id = ? order by created_at, rowid")
+      .all(h.sessionId);
+    expect(rows.map((r) => r.status)).toEqual(["resolved", "queued"]);
+    expect(h.status()).toBe("handed_off");
+  });
+
   test("a handoff that cannot be created is reported as handoff_failed, not handoff", async () => {
     const h = await harness({
       tools: (real) => ({

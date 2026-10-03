@@ -21,6 +21,7 @@ export const RULE_IDS = [
   "BUD_SAFE_MODE",
   "BUD_BREAKER",
   "BUD_PROVIDER",
+  "BUD_TOTAL",
   "RT_LOW_CONFIDENCE",
   "RT_OUT_OF_SCOPE",
   "SC_INVALID",
