@@ -110,7 +110,6 @@ export async function stageTable(
     clean: number;
     stale: number;
     updated_count: number;
-    same_source: number;
   }>(
     `select
       (select count(*)::integer from _typed) as rows_read,
@@ -118,15 +117,14 @@ export async function stageTable(
       (select count(*)::integer from _typed where _reasons = '') as valid,
       (select count(*)::integer from _clean) as clean,
       (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file < s.source_file)) as stale,
-      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file > s.source_file)) as updated_count,
-      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file = s.source_file)) as same_source`,
+      (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file >= s.source_file)) as updated_count`,
   );
 
   const columns = [...contract.columns.map((c) => ident(c.name)), "source_file"].join(", ");
   const updateCols = contract.columns.map((c) => `${ident(c.name)} = excluded.${ident(c.name)}`).join(", ");
   await duck.run(`insert into ${table} (${columns}, load_id)
     select ${columns}, ${lit(loadId)} from _clean
-    where not exists (select 1 from ${table} s where s.${pk} = _clean.${pk} and s.source_file >= _clean.source_file)
+    where not exists (select 1 from ${table} s where s.${pk} = _clean.${pk} and s.source_file > _clean.source_file)
     on conflict (${pk}) do update set ${updateCols}, source_file = excluded.source_file, load_id = excluded.load_id`);
   const fileRows = pending
     .map((f) => `(${lit(contract.table)}, ${lit(relative(rawDir, f.path))}, ${f.size}, ${lit(loadId)})`)
@@ -137,6 +135,6 @@ export async function stageTable(
   result.rejected = counts.rejected;
   result.duplicatesInBatch = counts.valid - counts.clean;
   result.updated = counts.updated_count;
-  result.inserted = counts.clean - counts.updated_count - counts.stale - counts.same_source;
+  result.inserted = counts.clean - counts.updated_count - counts.stale;
   return result;
 }

@@ -109,7 +109,7 @@ describe("stageTable", () => {
       `${TX_HEADER}\nT1,2026-06-10 12:00:00,2026-06-10,P1,C1,Purchase,Food,45.00,USD,,POS,Super Ahorro,Food,Mexico,CDMX,Approved,00,False,12.5\nT2,2026-06-10 13:00:00,2026-06-10,P1,C1,Purchase,Other,300.00,USD,,Web,Boutique Moda,Other,México,CDMX,Approved,00,False,88.0\nT3,2026-06-10 14:00:00,2026-06-10,P3,C3,Purchase,Entertainment,900000,ARS,950.00,POS,Teatro Nacional,Entertainment,Argentina,Buenos Aires,Approved,00,False,5.0\nT4,2026-06-10 15:00:00,2026-06-10,P2,C2,Withdrawal,,200000,COP,48.00,ATM,,,Colombia,Bogotá,Approved,00,False,3.0\nTX,not-a-date,2026-06-10,P1,C1,Purchase,Food,10,USD,,POS,Super Ahorro,Food,México,CDMX,Approved,00,False,1.0\nT8,2026-06-10 16:00:00,2026-06-10,P1,C1,Purchase,Food,50.00,USD,,POS,Mercado Local,Food,México,CDMX,Approved,00,False,6.0\n`,
     );
 
-    // Re-load: should pick up T8 as new, but NOT overwrite T1 with day=10's status
+    // Re-load: should pick up T8 as new, T2-T4 same-file updates, but NOT overwrite T1 with day=10's status
     const rerun = await stageTable(
       duck,
       transactions,
@@ -117,7 +117,7 @@ describe("stageTable", () => {
       config.rawDir,
       "load-2",
     );
-    expect(rerun).toMatchObject({ filesLoaded: 1, inserted: 1, updated: 0 });
+    expect(rerun).toMatchObject({ filesLoaded: 1, inserted: 1, updated: 3 });
 
     // Verify T1 still has status from day=11
     const t1Final = await duck.one<Record<string, unknown>>(
@@ -132,6 +132,44 @@ describe("stageTable", () => {
     );
     expect(t8.transaction_id).toBe("T8");
     expect(t8.source_file).toContain("day=10");
+
+    duck.close();
+  });
+
+  test("same-file re-load applies corrections", async () => {
+    const config = await makeWorkspace();
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+
+    // Initial load
+    await stageTable(duck, transactions, await listSourceFiles(config.rawDir, transactions.files), config.rawDir, "load-1");
+    const t6Before = await duck.one<Record<string, unknown>>(
+      "select transaction_status, source_file from stg.transactions where transaction_id = 'T6'",
+    );
+    expect(t6Before.transaction_status).toBe("Approved");
+
+    // Rewrite day=11 file in place: correct T6's status from Approved to Reversed (add extra newline to change size)
+    await Bun.write(
+      join(config.rawDir, "transactions/year=2026/month=06/day=11/transactions_20260611.csv"),
+      `${TX_HEADER}\nT1,2026-06-10 12:00:00,2026-06-11,P1,C1,Purchase,Food,45.00,USD,,POS,Super Ahorro,Food,Mexico,CDMX,Reversed,00,False,12.5\nT5,2025-01-05 09:00:00,2026-06-11,P1,C1,Purchase,Health,20.00,USD,,POS,Farmacia Salud,Health,México,CDMX,Approved,00,False,2.0\nT6,2026-06-11 09:00:00,2026-06-11,P1,C1,Purchase,Health,30.00,USD,,POS,Farmacia Salud,Health,México,CDMX,Reversed,00,False,4.0\n\n`,
+    );
+
+    // Re-load with corrected file: T1, T5, T6 are all updated (same source_file)
+    const reload = await stageTable(
+      duck,
+      transactions,
+      await listSourceFiles(config.rawDir, transactions.files),
+      config.rawDir,
+      "load-2",
+    );
+    expect(reload).toMatchObject({ filesLoaded: 1, inserted: 0, updated: 3 });
+
+    // Verify T6 has corrected status
+    const t6After = await duck.one<Record<string, unknown>>(
+      "select transaction_status, source_file from stg.transactions where transaction_id = 'T6'",
+    );
+    expect(t6After.transaction_status).toBe("Reversed");
+    expect(t6After.source_file).toContain("day=11");
 
     duck.close();
   });
