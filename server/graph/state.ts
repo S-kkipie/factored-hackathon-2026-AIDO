@@ -42,6 +42,12 @@ export type Outcome = "greeting" | "clarify" | "abstain" | "answered" | "handoff
 export interface Confirmation {
   approved: boolean;
   interruptId: string;
+  /**
+   * sha256(canonicalJson(confirmPayload(state))) at resume time, rebuilt from the checkpoint. `create_dispute`
+   * recomputes this from its own state and refuses to write on any mismatch (fix round 1: a keyed Command resume
+   * already scopes this answer to its own interrupt task, and this hash is the second, independent check).
+   */
+  payloadHash: string;
 }
 
 /** Value carried by the confirmation interrupt; `payload` is what the nonce is bound to. */

@@ -1,4 +1,5 @@
 import { interrupt } from "@langchain/langgraph";
+import { canonicalJson, sha256Hex } from "../hash";
 import { render, txLine } from "../policy/templates";
 import { val } from "../provenance";
 import { type RuleId, isRuleId } from "../rules";
@@ -17,7 +18,8 @@ const isConfirmation = (x: unknown): x is Confirmation =>
   typeof x === "object" &&
   x !== null &&
   typeof (x as Confirmation).approved === "boolean" &&
-  typeof (x as Confirmation).interruptId === "string";
+  typeof (x as Confirmation).interruptId === "string" &&
+  typeof (x as Confirmation).payloadHash === "string";
 
 /**
  * Out-of-band confirmation (spec 3.2 rule 5). This node has no side effects: LangGraph re-runs it on resume. The
@@ -30,7 +32,7 @@ export const confirmNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
     text: render("confirm_dispute", d.language, { transactions: s.targets.map((t) => t.v) }),
   };
   const answer: unknown = interrupt(value);
-  return { confirmation: isConfirmation(answer) ? answer : { approved: false, interruptId: "" } };
+  return { confirmation: isConfirmation(answer) ? answer : { approved: false, interruptId: "", payloadHash: "" } };
 };
 
 export const afterConfirm = (s: TurnValues): string => (s.confirmation?.approved ? "create_dispute" : "cancelled");
@@ -40,10 +42,22 @@ export const cancelledNode = (d: GraphDeps) => async (s: TurnValues): Promise<Tu
   return { reply: render("dispute_cancelled", d.language), outcome: "cancelled", ruleIds: s.ruleIds };
 };
 
-/** The write. Idempotent per confirmation: the key is the session plus the LangGraph interrupt id. */
+/**
+ * The write. Idempotent per confirmation: the key is the session plus the LangGraph interrupt id.
+ *
+ * Defense in depth beyond the keyed Command resume (which already scopes an answer to its own interrupt task):
+ * recompute the hash of what this confirmation claims to be approving from the current (checkpointed) state and
+ * refuse to write on any mismatch or absence. A resume answer can only come from `confirmNode`'s own fallback or
+ * from the turn runner's `resumeTurn`, which always rebuilds this hash from the payload the nonce was bound to;
+ * nothing legitimate can reach here with a wrong hash, so a mismatch means the resume was stale or tampered with.
+ */
 export const createDisputeNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
   const interruptId = s.confirmation?.interruptId;
-  if (!interruptId) return { forceHandoff: true, ruleIds: addRules(s.ruleIds, "TL_NONCE_MISMATCH") };
+  const expectedHash = sha256Hex(canonicalJson(confirmPayload(s)));
+  if (!interruptId || s.confirmation?.payloadHash !== expectedHash) {
+    audit(d, "create_dispute", ["TL_NONCE_MISMATCH"]);
+    return { forceHandoff: true, ruleIds: addRules(s.ruleIds, "TL_NONCE_MISMATCH") };
+  }
   const slots = s.slots?.v ?? {};
   try {
     const { value } = await runTool("createDispute", () =>

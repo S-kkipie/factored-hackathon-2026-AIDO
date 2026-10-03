@@ -1,3 +1,4 @@
+import { Command } from "@langchain/langgraph";
 import { describe, expect, test } from "bun:test";
 import { listSpans } from "../../server/trace";
 import { FIXTURE } from "./fixtures";
@@ -134,6 +135,11 @@ describe("dispute flow", () => {
     expect(doneOf(later).outcome).toBe("handed_off");
     const stored = h.ops.query<{ text: string }, []>("select text from messages").get()!.text;
     expect(stored).toContain("[EMAIL]");
+
+    // Even once handed off, the input gate still runs first: an empty message is blocked, not stored.
+    const blocked = await h.send("   ");
+    expect(doneOf(blocked).outcome).toBe("blocked");
+    expect(h.ops.query<{ n: number }, []>("select count(*) as n from messages").get()!.n).toBe(1);
   });
 
   test("an id from another customer is never resolved", async () => {
@@ -150,6 +156,61 @@ describe("dispute flow", () => {
     expect(doneOf(ev).outcome).toBe("clarify");
     expect(messageOf(ev)).toContain(FIXTURE.txSmall);
     expect(messageOf(ev)).toContain(FIXTURE.txPending);
+  });
+});
+
+describe("confirmation integrity (fix round 1)", () => {
+  const EXTRA_TX = "TRX-B1EXTRA000000000007";
+  // A second auto-dispute-eligible transaction, distinct from FIXTURE.txSmall, seeded only for this describe block.
+  const SEED_SQL = `insert into transactions values ('${EXTRA_TX}', '2026-06-14T12:00:00', 'PRD-A1', '${FIXTURE.normal}',
+    'Purchase', 'Health', 35, 'USD', 35, 'POS', 'Farmacia Norte', 'Health', 'México', 'CDMX', 'Approved', '00', 2, 't.csv', 'L1')`;
+
+  test("a concurrent resume and a new dispute message cannot cross-apply a confirmation to the wrong transaction", async () => {
+    const h = await harness({
+      seedServingSql: SEED_SQL,
+      script: (req) => {
+        if (!req.system.startsWith("You extract")) return JSON.stringify({ reply: "x" });
+        return req.user.includes("Super Ahorro")
+          ? JSON.stringify({ merchant: "Super Ahorro", amount: 45, reason: "unrecognized" })
+          : JSON.stringify({ merchant: "Farmacia Norte", amount: 35, reason: "unrecognized" });
+      },
+    });
+    const a = interruptOf(await h.send("No reconozco un cargo de 45 dólares en Super Ahorro"))!;
+
+    // Race a resume of A against a brand-new dispute message on the same session. Whichever wins the lock runs
+    // to completion first; the point is that neither ordering can let A's approval create (or let anything
+    // create) a dispute for the other message's transaction.
+    await Promise.all([
+      h.resume(a.interruptId, a.nonce, true),
+      h.send("No reconozco un cargo de 35 dólares en Farmacia Norte"),
+    ]);
+
+    // A's own dispute may or may not exist yet, depending on ordering — but every dispute that does exist must
+    // be exactly A's confirmed transaction, never the other message's.
+    for (const d of h.disputes()) {
+      expect(JSON.parse(d.transaction_ids)).toEqual([FIXTURE.txSmall]);
+    }
+    expect(h.disputes().some((d) => JSON.parse(d.transaction_ids).includes(EXTRA_TX))).toBe(false);
+  });
+
+  test("a resume value whose payload hash does not match the checkpointed confirmation hands off and creates nothing", async () => {
+    const disputeSlots = { merchant: "Super Ahorro", amount: 45, reason: "unrecognized" };
+    const h = await harness({ script: byPurpose(disputeSlots, "x") });
+    const it = interruptOf(await h.send("No reconozco un cargo de 45 dólares en Super Ahorro"))!;
+
+    // Bypass resumeTurn (which always computes the hash correctly from the checkpoint) and drive the compiled
+    // graph directly with an approval whose payloadHash is wrong, as createDisputeNode must independently reject.
+    await h.driveRaw(
+      new Command({
+        resume: { [it.interruptId]: { approved: true, interruptId: it.interruptId, payloadHash: "0".repeat(64) } },
+      }),
+    );
+
+    expect(h.disputes()).toEqual([]);
+    const lastCreateDispute = h.ops
+      .query<{ rule_id: string | null }, []>("select rule_id from audit_events where kind = 'create_dispute' order by seq desc limit 1")
+      .get();
+    expect(lastCreateDispute?.rule_id).toBe("TL_NONCE_MISMATCH");
   });
 });
 
@@ -205,6 +266,8 @@ describe("escalation and safety", () => {
     expect(text).not.toContain("4111 1111");
     const audit = h.ops.query<{ payload: string }, []>("select payload from audit_events").all().map((r) => r.payload).join("");
     expect(audit).not.toContain("4111");
+    const spans = h.ops.query<{ attributes: string }, []>("select attributes from spans").all().map((r) => r.attributes).join("");
+    expect(spans).not.toContain("4111");
   });
 
   test("exhausted turn budget escalates without running the graph", async () => {

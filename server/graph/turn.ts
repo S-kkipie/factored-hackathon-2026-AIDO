@@ -9,8 +9,7 @@ import { CallCounter, type CircuitBreaker, checkBudget, recordTurn } from "../ga
 import { injectionSignal } from "../gates/injection";
 import { inputGate } from "../gates/input";
 import { consumeNonce, issueNonce } from "../gates/nonce";
-import { maskPii } from "../gates/pii";
-import { sha256Hex } from "../hash";
+import { canonicalJson, sha256Hex } from "../hash";
 import { createGateway } from "../llm/gateway";
 import type { Llm } from "../llm/types";
 import { BUDGETS, POLICY } from "../policy/config";
@@ -22,7 +21,7 @@ import { ToolError } from "../tools/runtime";
 import { Tracer } from "../trace";
 import { buildGraph, type ConversationGraph } from "./build";
 import type { GraphDeps } from "./deps";
-import { type ConfirmInterrupt, type Outcome, type TurnValues, freshTurn } from "./state";
+import { type ConfirmInterrupt, type Confirmation, type Outcome, type TurnValues, freshTurn } from "./state";
 
 export interface TurnDeps {
   cfg: Pick<ServerConfig, "safeMode" | "modelTimeoutMs" | "canarySecret">;
@@ -163,19 +162,58 @@ const turnsOf = (ops: Database, sessionId: string) =>
   ops.query<{ turns: number }, [string]>("select turns from sessions where session_id = ?").get(sessionId)?.turns ?? 0;
 
 /**
+ * In-process per-session mutex (fix round 1). `runTurn` and `resumeTurn` each run their entire body — including
+ * the graph stream — while holding this lock, keyed by session id, so a `resumeTurn` can never read a checkpoint
+ * with `getState()` and then, after a concurrent `runTurn` on the same session has advanced the thread to a new
+ * confirmation, `stream()` against that newer checkpoint instead. The keyed Command resume in `resumeTurn` and
+ * the payload-hash recheck in `createDisputeNode` are additional, independent layers on top of this; this lock
+ * is what removes the race itself. It only coordinates within one process: spec 8 calls for a single Cloud Run
+ * instance (or session-sticky routing) for the invariant to hold, and it does not survive a process restart.
+ */
+const sessionLocks = new Map<string, Promise<void>>();
+
+async function* withSessionLock(sessionId: string, run: () => AsyncGenerator<TurnEvent>): AsyncGenerator<TurnEvent> {
+  const prior = sessionLocks.get(sessionId) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chain = prior.then(() => mine);
+  sessionLocks.set(sessionId, chain);
+  await prior;
+  try {
+    yield* run();
+  } finally {
+    release();
+    if (sessionLocks.get(sessionId) === chain) sessionLocks.delete(sessionId);
+  }
+}
+
+/**
  * One customer turn. Order (spec 4.5): session → budget → input gate (size, rate, PII mask) → turn count →
  * injection signal → graph. Raw text never reaches the checkpoint, the audit log or a span.
  */
-export async function* runTurn(deps: TurnDeps, session: CustomerSession, text: string): AsyncGenerator<TurnEvent> {
+export function runTurn(deps: TurnDeps, session: CustomerSession, text: string): AsyncGenerator<TurnEvent> {
+  return withSessionLock(session.sessionId, () => runTurnLocked(deps, session, text));
+}
+
+async function* runTurnLocked(deps: TurnDeps, session: CustomerSession, text: string): AsyncGenerator<TurnEvent> {
   customerOf(session);
   const now = (deps.now ?? (() => new Date()))();
   const sid = session.sessionId;
   const lang = session.language;
 
   if (session.status === "handed_off") {
+    const gate = inputGate(deps.ops, sid, text, now.getTime());
+    if (!gate.ok) {
+      appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", ruleId: gate.ruleId, payload: {} });
+      yield { type: "message", text: render("blocked_input", lang) };
+      yield { type: "done", outcome: "blocked", ruleIds: [gate.ruleId] };
+      return;
+    }
     deps.ops
       .query("insert into messages (session_id, author, text, at) values (?, 'customer', ?, ?)")
-      .run(sid, maskPii(text.slice(0, 1000)).text, now.toISOString());
+      .run(sid, gate.text, now.toISOString());
     yield { type: "message", text: render("handed_off", lang) };
     yield { type: "done", outcome: "handed_off", ruleIds: [] };
     return;
@@ -215,7 +253,11 @@ export interface ResumeInput {
  * Resumes a paused confirmation. The payload the nonce must match is rebuilt from the checkpoint, never taken
  * from the client; a stale interrupt (superseded by a newer message) or a reused nonce changes nothing.
  */
-export async function* resumeTurn(deps: TurnDeps, session: CustomerSession, r: ResumeInput): AsyncGenerator<TurnEvent> {
+export function resumeTurn(deps: TurnDeps, session: CustomerSession, r: ResumeInput): AsyncGenerator<TurnEvent> {
+  return withSessionLock(session.sessionId, () => resumeTurnLocked(deps, session, r));
+}
+
+async function* resumeTurnLocked(deps: TurnDeps, session: CustomerSession, r: ResumeInput): AsyncGenerator<TurnEvent> {
   customerOf(session);
   const now = (deps.now ?? (() => new Date()))();
   const sid = session.sessionId;
@@ -236,5 +278,10 @@ export async function* resumeTurn(deps: TurnDeps, session: CustomerSession, r: R
   if (!nonce.ok) return yield* invalid(nonce.ruleId);
   appendAudit(deps.ops, { sessionId: sid, kind: "confirm_answered", payload: { interruptId: r.interruptId, approved: r.approved } });
 
-  yield* drive(deps, app, sid, new Command({ resume: { approved: r.approved, interruptId: r.interruptId } }), now.getTime());
+  const payloadHash = sha256Hex(canonicalJson(payload));
+  const answer: Confirmation = { approved: r.approved, interruptId: r.interruptId, payloadHash };
+  // Keyed by the interrupt's own id (an XXH3 hash of its checkpoint namespace, per @langchain/langgraph's
+  // Command(resume=) map form): this resume value can only ever be consumed by *this* interrupt's task, never
+  // by a newer confirmation a racing runTurn moved the thread to after the `getState` call above.
+  yield* drive(deps, app, sid, new Command({ resume: { [r.interruptId]: answer } }), now.getTime());
 }
