@@ -72,3 +72,29 @@ describe("inputGate", () => {
     expect(r).toEqual({ ok: true, text: "mi correo es [EMAIL]", piiFound: ["email"] });
   });
 });
+
+describe("maskPii normalization and local phones", () => {
+  test("full-width digits are normalized and masked", () => {
+    const r = maskPii("tarjeta ４１１１ １１１１ １１１１ １１１１");
+    expect(r.text).toBe("tarjeta [CARD]");
+    expect(r.found).toEqual(["card"]);
+  });
+
+  test("zero-width characters inside a card number do not prevent masking", () => {
+    for (const zw of ["​", "‌", "‍", "﻿", "⁠"]) {
+      expect(maskPii(`tarjeta 4111${zw}1111 1111 1111`).text).toBe("tarjeta [CARD]");
+    }
+  });
+
+  test("local phone formats with separators are masked", () => {
+    expect(maskPii("llámame al 55 1234 5678").text).toBe("llámame al [PHONE]");
+    expect(maskPii("meu celular (11) 91234-5678").text).toBe("meu celular [PHONE]");
+  });
+
+  test("phones do not swallow amounts, dates, ids or invalid cards", () => {
+    expect(maskPii("me cobraron $1.234,56 el 10/06/2026 y otro de 45.00 USD").found).toEqual([]);
+    expect(maskPii("el cargo TRX-A1SMALL000000000001 de 45 USD").found).toEqual([]);
+    expect(maskPii("número 4111 1111 1111 1112").found).toEqual([]);
+    expect(maskPii("el 2026-06-10 12:00:00 pagué 1 234 567").found).toEqual([]);
+  });
+});

@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { detectLanguage, parseAmount, responseGate } from "../../server/gates/response";
 
 const facts = {
-  amounts: [45, 1234.56],
+  amounts: [
+    { value: 45, currency: "USD" },
+    { value: 1234.56, currency: "USD" },
+  ],
   ids: ["TRX-A1SMALL000000000001", "D-1A2B3C4D"],
   templates: ["Abrimos la disputa D-1A2B3C4D; la revisión toma hasta 10 días hábiles."],
 };

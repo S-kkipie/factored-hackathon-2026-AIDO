@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { sha256Hex } from "../hash";
+import { canonicalJson, sha256Hex } from "../hash";
 
 interface NonceContext {
   sessionId: string;
@@ -9,7 +9,8 @@ interface NonceContext {
 
 export type NonceRule = "TL_NONCE_UNKNOWN" | "TL_NONCE_USED" | "TL_NONCE_EXPIRED" | "TL_NONCE_MISMATCH";
 
-const hashPayload = (payload: unknown) => sha256Hex(JSON.stringify(payload));
+/** Key order never changes the hash: payloads are serialized as canonical JSON. */
+const hashPayload = (payload: unknown) => sha256Hex(canonicalJson(payload));
 
 /** Issues a single-use nonce that only a UI confirmation can return; chat text can never confirm. */
 export function issueNonce(ops: Database, ctx: NonceContext, nowMs: number, ttlMs = 10 * 60_000): string {

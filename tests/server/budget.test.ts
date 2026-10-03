@@ -118,3 +118,13 @@ describe("nonces", () => {
     expect(consumeNonce(ops, { ...ctx, nonce }, 1001)).toEqual({ ok: false, ruleId: "TL_NONCE_EXPIRED" });
   });
 });
+
+describe("nonce payload hashing", () => {
+  test("payloads that differ only in key order consume successfully", () => {
+    const ops = makeOps();
+    const nonce = issueNonce(ops, { sessionId: "s1", interruptId: "i", payload: { a: 1, b: { x: [1, 2], y: "z" } } }, 0);
+    expect(
+      consumeNonce(ops, { sessionId: "s1", interruptId: "i", nonce, payload: { b: { y: "z", x: [1, 2] }, a: 1 } }, 1),
+    ).toEqual({ ok: true });
+  });
+});
