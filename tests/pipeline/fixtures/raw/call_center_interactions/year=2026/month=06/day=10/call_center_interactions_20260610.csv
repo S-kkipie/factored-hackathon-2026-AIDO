@@ -1,0 +1,4 @@
+interaction_id,interaction_date,process_date,customer_id,channel,reason_category,duration_seconds,wait_time_seconds,was_resolved,was_escalated,detected_sentiment
+I1,2026-06-10 09:00:00,2026-06-10,C1,Phone,Transaccional,200.0,120.0,True,False,Neutral
+I2,2026-06-10 09:30:00,2026-06-10,C2,Phone,Queja,450.0,110.0,False,True,Negativo
+I3,2026-06-10 10:00:00,2026-06-10,C3,WhatsApp,Transaccional,,130.0,True,False,Positivo

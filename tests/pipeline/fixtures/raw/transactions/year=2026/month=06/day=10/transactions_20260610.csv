@@ -1,0 +1,6 @@
+transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score
+T1,2026-06-10 12:00:00,2026-06-10,P1,C1,Purchase,Food,45.00,USD,,POS,Super Ahorro,Food,Mexico,CDMX,Approved,00,False,12.5
+T2,2026-06-10 13:00:00,2026-06-10,P1,C1,Purchase,Other,300.00,USD,,Web,Boutique Moda,Other,México,CDMX,Approved,00,False,88.0
+T3,2026-06-10 14:00:00,2026-06-10,P3,C3,Purchase,Entertainment,900000,ARS,950.00,POS,Teatro Nacional,Entertainment,Argentina,Buenos Aires,Approved,00,False,5.0
+T4,2026-06-10 15:00:00,2026-06-10,P2,C2,Withdrawal,,200000,COP,48.00,ATM,,,Colombia,Bogotá,Approved,00,False,3.0
+TX,not-a-date,2026-06-10,P1,C1,Purchase,Food,10,USD,,POS,Super Ahorro,Food,México,CDMX,Approved,00,False,1.0

@@ -1,0 +1,5 @@
+product_id,customer_id,product_type,product_number,currency,current_balance,credit_limit,product_status,opening_date,last_updated
+P1,C1,Tarjeta Crédito,4111111111111111,USD,1200.50,5000,Active,2024-01-02,2026-06-01 10:00:00
+P2,C2,Cuenta Ahorro,1234567890,COP,3500000,,Active,2024-02-02,2026-06-01 10:00:00
+P3,C3,Tarjeta Débito,5222222222222222,ARS,800000,,Active,2024-03-02,2026-06-01 10:00:00
+P9,C9,Cuenta Ahorro,9999,USD,10,,Active,2024-03-02,2026-06-01 10:00:00

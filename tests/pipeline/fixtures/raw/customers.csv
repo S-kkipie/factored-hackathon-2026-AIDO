@@ -1,0 +1,5 @@
+customer_id,document_type,first_name,last_name,country,segment,customer_status,detected_accent,registration_date,last_updated
+C1,Pasaporte,Ana,Lopez,México,Basic,Active,mexican,2024-01-01 10:00:00,2026-06-01 10:00:00
+C2,CC,Juan,Perez,Colombia,Plus,Suspended,colombian,2024-02-01 10:00:00,2026-06-01 10:00:00
+C3,DNI,Sofia,Gomez,Argentina,Premium,Active,,2024-03-01 10:00:00,2026-06-01 10:00:00
+C4,DNI,Bad,Row,Argentina,Gold,Active,argentine,2024-03-01 10:00:00,2026-06-01 10:00:00

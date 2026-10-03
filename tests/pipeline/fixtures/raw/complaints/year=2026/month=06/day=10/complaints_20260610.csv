@@ -1,0 +1,3 @@
+complaint_id,creation_date,process_date,customer_id,case_type,category,subcategory,reception_channel,affected_product_id,description,claimed_amount,currency,priority,status,sla_breached,resolution_days,resolution_satisfaction,is_repeat_complainer
+Q1,2026-06-10 10:00:00,2026-06-10,C3,Complaint,Transactions,Cargo no reconocido,App,P3,Queja relacionada con transactions,950,USD,High,Open,False,,,True
+Q2,2026-06-10 11:00:00,2026-06-10,C1,Claim,Fees,Cobro indebido,Call Center,P1,Queja relacionada con fees,15,USD,Low,Resolved,True,20,3,False
