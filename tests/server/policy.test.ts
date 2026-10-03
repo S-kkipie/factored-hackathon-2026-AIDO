@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { POLICY } from "../../server/policy/config";
 import type { Transaction } from "../../server/db/serving";
 import { openServing } from "../../server/db/serving";
 import { type PolicyInput, decide } from "../../server/policy/rules";
@@ -41,7 +42,7 @@ describe("decide", () => {
     ["repeat complainer escalates", base({ targets: [tx(FIXTURE.txSmall)], repeatComplainer: true }), "escalate", ["POL_REPEAT"]],
     ["high risk escalates", base({ intent: "check_balance", riskScore: 3 }), "escalate", ["POL_RISK"]],
   ] as const)("%s", (_, input, action, ruleIds) => {
-    expect(decide(input)).toEqual({ action, ruleIds: [...ruleIds], policyVersion: "2026-10-02.1" });
+    expect(decide(input)).toEqual({ action, ruleIds: [...ruleIds], policyVersion: POLICY.version });
   });
 
   test("accumulates every escalation reason", () => {
@@ -124,7 +125,7 @@ describe("decide boundaries and fail-closed inputs", () => {
     expect(decide(base({ customer: suspended, targets: [tx(FIXTURE.txLarge)] }))).toEqual({
       action: "escalate",
       ruleIds: ["POL_STATUS"],
-      policyVersion: "2026-10-02.1",
+      policyVersion: POLICY.version,
     });
   });
 });

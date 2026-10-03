@@ -26,6 +26,10 @@ const MIGRATIONS = `
   create table if not exists spend (day text primary key, usd real not null default 0);
   create table if not exists rate_events (session_id text not null, at_ms integer not null);
   create index if not exists rate_events_session on rate_events (session_id, at_ms);
+  create table if not exists messages (
+    id integer primary key autoincrement, session_id text not null, author text not null, text text not null,
+    at text not null);
+  create index if not exists messages_session on messages (session_id, id);
 `;
 
 export function openOps(path: string): Database {

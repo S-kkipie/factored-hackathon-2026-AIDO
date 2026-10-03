@@ -10,10 +10,14 @@ export interface Policy {
   riskEscalate: number;
   /** Transaction types eligible for automatic dispute intake; anything else escalates. */
   disputableTypes: readonly string[];
+  /** Business days quoted in the dispute-created template. */
+  disputeReviewDays: number;
+  /** Router confidence below this clarifies instead of acting. */
+  routerThreshold: number;
 }
 
 export const POLICY: Policy = {
-  version: "2026-10-02.1",
+  version: "2026-10-03.1",
   clock: "2026-06-17",
   maxAutoUsd: 250,
   fraudScore: 30,
@@ -21,6 +25,8 @@ export const POLICY: Policy = {
   maxTxPerDispute: 2,
   riskEscalate: 3,
   disputableTypes: ["Purchase", "Withdrawal", "Adjustment"],
+  disputeReviewDays: 10,
+  routerThreshold: 0.6,
 };
 
 export interface Budgets {

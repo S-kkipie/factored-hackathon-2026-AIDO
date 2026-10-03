@@ -9,8 +9,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ag-ui/core": "1.0.1",
+    "@ag-ui/encoder": "1.0.1",
     "@duckdb/node-api": "^1.5.6-r.1",
+    "@google/genai": "2.27.0",
+    "@langchain/core": "1.2.14",
+    "@langchain/langgraph": "1.4.18",
+    "@langchain/langgraph-checkpoint": "1.1.5",
     "@sinclair/typebox": "^0.34.52",
+    "elysia": "1.4.30",
     "jose": "^6.2.12"
   },
   "devDependencies": {

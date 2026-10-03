@@ -10,6 +10,14 @@ export interface ServerConfig {
   agentPin: string;
   /** Kill switch: no model calls at all, templates and escalation only. */
   safeMode: boolean;
+  /** Absent key means no model: the graph runs on templates and escalation only. */
+  geminiApiKey: string | null;
+  /** Pinned model version (spec 4.5). */
+  geminiModel: string;
+  modelTimeoutMs: number;
+  /** Secret mixed into the per-session canary token that must never appear in a reply. */
+  canarySecret: string;
+  port: number;
 }
 
 export function loadServerConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
@@ -23,5 +31,10 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     demoPin: env.DEMO_PIN ?? "2468",
     agentPin: env.AGENT_PIN ?? "1357",
     safeMode: env.SAFE_MODE === "1",
+    geminiApiKey: env.GEMINI_API_KEY || null,
+    geminiModel: env.GEMINI_MODEL ?? "gemini-3.8-flash",
+    modelTimeoutMs: Number(env.MODEL_TIMEOUT_MS ?? 15000),
+    canarySecret: secret,
+    port: Number(env.PORT ?? 8080),
   };
 }

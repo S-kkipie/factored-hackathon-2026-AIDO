@@ -31,7 +31,8 @@ const SESSION_STATUSES: readonly SessionStatus[] = ["active", "closed", "handed_
 export interface Auth {
   login(persona: string, pin: string, language: Language): Promise<{ token: string; session: Session }>;
   agentLogin(pin: string): Promise<{ token: string; session: Session }>;
-  verify(token: string): Promise<Session>;
+  /** Verifies a token; by default only `active` sessions pass. Read-only endpoints may also allow `handed_off`. */
+  verify(token: string, allow?: readonly SessionStatus[]): Promise<Session & { status: SessionStatus }>;
   /** Ends a session: its tokens stop verifying immediately. */
   revoke(sessionId: string): void;
   setStatus(sessionId: string, status: SessionStatus): void;
@@ -81,7 +82,7 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
       if (pin !== cfg.agentPin) throw new AuthError("IN_AUTH_001", "invalid agent credentials");
       return issue("agent", null, "es");
     },
-    async verify(token) {
+    async verify(token, allow = ["active"]) {
       let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
       try {
         ({ payload } = await jwtVerify(token, cfg.jwtSecret, { algorithms: ["HS256"], currentDate: new Date(now()) }));
@@ -96,8 +97,11 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
           "select status, language, role, customer_id from sessions where session_id = ?",
         )
         .get(sessionId);
-      if (!row || row.status !== "active") throw new AuthError("IN_SESSION_REVOKED", "session is not active");
+      if (!row || !allow.includes(row.status as SessionStatus)) {
+        throw new AuthError("IN_SESSION_REVOKED", "session is not active");
+      }
       return {
+        status: row.status as SessionStatus,
         sessionId,
         role: row.role,
         customerId: row.customer_id ? val(row.customer_id, "jwt") : null,
