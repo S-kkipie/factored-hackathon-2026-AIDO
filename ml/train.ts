@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../pipeline/config";
 import { loadServerConfig } from "../server/config";
@@ -6,7 +6,7 @@ import { createGeminiEmbedder } from "../server/llm/embedder";
 import { createGeminiLlm } from "../server/llm/gemini";
 import { SpendLedger } from "../server/llm/ledger";
 import { RunBudget, meteredEmbedder, meteredLlm } from "../server/llm/metered";
-import { createGeminiRouter } from "../server/router/gemini";
+import { createGeminiRouter, ZERO_SHOT_PROMPT_VERSION } from "../server/router/gemini";
 import { createKeywordRouter } from "../server/router/keyword";
 import { type Utterance, loadFrozenTestSet, readJsonl } from "./dataset";
 import { EMBED_LR_VERSION, runExperiment } from "./experiment";
@@ -18,6 +18,14 @@ import { renderRouterReport } from "./report";
  * files the server loads. Spend is capped by the project ledger and ML_RUN_LIMIT_USD (default 0.5).
  * Embeddings are cached in data/ml-cache/ (git-ignored) so re-runs cost nothing for unchanged texts.
  */
+
+/** Writes via a temp file + rename so a crash mid-write never leaves a truncated or corrupt file on disk. */
+async function atomicWrite(path: string, content: string): Promise<void> {
+  const tmp = `${path}.tmp`;
+  await Bun.write(tmp, content);
+  renameSync(tmp, path);
+}
+
 const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET ?? "x".repeat(32) };
 const cfg = loadServerConfig(env);
 if (!cfg.geminiApiKey) throw new Error("GEMINI_API_KEY is required to train the router");
@@ -47,20 +55,31 @@ const result = await runExperiment({
   zeroShotDevPerGroup: 5,
   latencySample: 20,
   spent: () => budget.spent(),
+  // Persist every embedding chunk as it lands, so a crash or spend-cap error later in the run (after paid API
+  // calls) does not lose the vectors already paid for.
+  onEmbedded: async (c) => {
+    await atomicWrite(cachePath, [...c.entries()].map((e) => JSON.stringify(e)).join("\n") + "\n");
+  },
 });
 result.runId = `router-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 
-await Bun.write(cachePath, [...cache.entries()].map((e) => JSON.stringify(e)).join("\n") + "\n");
 mkdirSync(join(ROOT, "experiments"), { recursive: true });
 mkdirSync(join(ROOT, "ml/models"), { recursive: true });
 const { model, ...summary } = result;
-await Bun.write(join(ROOT, "experiments", `${result.runId}.json`), `${JSON.stringify({ ...summary, spentUsd: budget.spent(), embedModel: embedder.model }, null, 2)}\n`);
-await Bun.write(join(ROOT, "ml/models/router-embed-lr.json"), `${JSON.stringify({ version: EMBED_LR_VERSION, runId: result.runId, ...model })}\n`);
-await Bun.write(
+await atomicWrite(
+  join(ROOT, "experiments", `${result.runId}.json`),
+  `${JSON.stringify(
+    { ...summary, spentUsd: budget.spent(), embedModel: embedder.model, chatModel: cfg.geminiModel, zeroShotPromptVersion: ZERO_SHOT_PROMPT_VERSION },
+    null,
+    2,
+  )}\n`,
+);
+await atomicWrite(join(ROOT, "ml/models/router-embed-lr.json"), `${JSON.stringify({ version: EMBED_LR_VERSION, runId: result.runId, ...model })}\n`);
+await atomicWrite(
   join(ROOT, "ml/models/router-selection.json"),
   `${JSON.stringify({ router: result.selected.router, runId: result.runId, rationale: result.selected.rationale }, null, 2)}\n`,
 );
-await Bun.write(
+await atomicWrite(
   join(ROOT, "reports/router.md"),
   renderRouterReport(result, { model: embedder.model, trainSource: "hand-written seeds + Gemini paraphrases", spentUsd: budget.spent() }),
 );

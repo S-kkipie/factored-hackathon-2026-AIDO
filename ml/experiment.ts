@@ -1,5 +1,7 @@
 import { sha256Hex } from "../server/hash";
-import type { Embedder } from "../server/llm/embedder";
+import { estimateTokens, type Embedder } from "../server/llm/embedder";
+import { SpendCapError } from "../server/llm/metered";
+import { costUsd } from "../server/llm/types";
 import { createEmbeddingRouter } from "../server/router/embedding";
 import { type LogRegModel, predictProba } from "../server/router/linear";
 import type { Router } from "../server/router/types";
@@ -11,6 +13,12 @@ import { dropNearTest, splitByFamily, stratifiedSample } from "./split";
 export const EMBED_LR_VERSION = "1";
 /** Routers that fit the per-turn budget (≤ 3 chat calls) and can be deployed; see the selection rule below. */
 export const DEPLOYABLE = ["keyword", "embed-lr"] as const;
+/** Share of each (label, language) group's families held out for dev (spec 6 leakage prevention). */
+const DEV_SHARE = 0.2;
+/** Cosine similarity above which a training row is dropped as a near-duplicate of a test row. */
+const COSINE_CUTOFF = 0.95;
+/** Texts are embedded in chunks this size so a failure mid-run keeps the vectors already paid for. */
+const EMBED_CHUNK = 100;
 
 export interface ExperimentDeps {
   test: Utterance[];
@@ -30,10 +38,17 @@ export interface ExperimentDeps {
   epochs?: number;
   /** Total USD spent so far by this run (RunBudget.spent); used to price the zero-shot router. */
   spent?: () => number;
+  /**
+   * Called after every embedding chunk is merged into the cache, so a crash or SpendCapError later in the run
+   * does not lose vectors already paid for. train.ts uses it to persist the embedding cache to disk.
+   */
+  onEmbedded?: (cache: Map<string, number[]>) => Promise<void> | void;
 }
 
 export interface RouterResult {
   name: string;
+  /** The router's own versioned name (e.g. keyword-v1, embed-lr@1, gemini-zeroshot@2026-10-03.1). */
+  version: string;
   threshold: number;
   test: Report;
   macroF1CI: [number, number];
@@ -44,6 +59,8 @@ export interface RouterResult {
   coverageCurve: CoveragePoint[];
   latencyMs: { p50: number; p95: number };
   usdPerClassification: number;
+  /** Count of test predictions with confidence 0 (provider failure or no match; always clarified). */
+  failures: number;
 }
 
 export interface ExperimentResult {
@@ -60,10 +77,25 @@ export interface ExperimentResult {
   routers: RouterResult[];
   selected: { router: (typeof DEPLOYABLE)[number]; rationale: string };
   model: LogRegModel;
+  /** Hyperparameters and versions fixed for this run (spec 6 tracking). */
+  config: {
+    seed: number;
+    devShare: number;
+    cosineCutoff: number;
+    l2Grid: number[];
+    epochs: number;
+    zeroShotDevPerGroup: number;
+    latencySample: number;
+    embedLrVersion: string;
+  };
+  /** Set when the zero-shot comparison was skipped because the spend cap was reached, with the reason. */
+  zeroShotSkipped?: string;
+  /** Size of the stratified dev sample used to pick the zero-shot threshold; null when zero-shot didn't run. */
+  zeroShotDevSampleSize: number | null;
 }
 
 const hashRows = (rows: readonly Utterance[]) =>
-  sha256Hex(rows.map((r) => `${r.id}\t${r.label}\t${r.text}`).join("\n"));
+  sha256Hex(rows.map((r) => `${r.id}\t${r.label}\t${r.text}\t${r.family ?? ""}`).join("\n"));
 
 const percentile = (xs: number[], q: number) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -79,9 +111,11 @@ const argmaxPred = (m: LogRegModel, gold: Utterance, v: number[]): Prediction =>
 async function embedAll(deps: ExperimentDeps, texts: string[]): Promise<Map<string, number[]>> {
   const cache = deps.cache ?? new Map<string, number[]>();
   const missing = [...new Set(texts)].filter((t) => !cache.has(t));
-  if (missing.length > 0) {
-    const { vectors } = await deps.embedder.embed(missing);
-    missing.forEach((t, i) => cache.set(t, vectors[i]!));
+  for (let i = 0; i < missing.length; i += EMBED_CHUNK) {
+    const chunk = missing.slice(i, i + EMBED_CHUNK);
+    const { vectors } = await deps.embedder.embed(chunk);
+    chunk.forEach((t, j) => cache.set(t, vectors[j]!));
+    await deps.onEmbedded?.(cache);
   }
   return cache;
 }
@@ -98,7 +132,7 @@ async function routeAll(router: Router, rows: readonly Utterance[]) {
   return { preds, ms };
 }
 
-function summarize(name: string, preds: Prediction[], threshold: number, ms: number[], usd: number): RouterResult {
+function summarize(name: string, version: string, preds: Prediction[], threshold: number, ms: number[], usd: number): RouterResult {
   const labels = [...ROUTER_LABELS];
   const test = evaluate(preds, labels);
   const perLanguageMacroF1 = Object.fromEntries(
@@ -107,6 +141,7 @@ function summarize(name: string, preds: Prediction[], threshold: number, ms: num
   const grid = Array.from({ length: 21 }, (_, i) => i / 20);
   return {
     name,
+    version,
     threshold,
     test,
     macroF1CI: bootstrapCI(preds, (s) => evaluate(s, labels).macroF1, 1000, 42),
@@ -116,6 +151,7 @@ function summarize(name: string, preds: Prediction[], threshold: number, ms: num
     coverageCurve: coverageCurve(preds, grid),
     latencyMs: { p50: percentile(ms, 0.5), p95: percentile(ms, 0.95) },
     usdPerClassification: preds.length === 0 ? 0 : usd / preds.length,
+    failures: preds.filter((p) => p.confidence === 0).length,
   };
 }
 
@@ -149,8 +185,8 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
   const vecs = await embedAll(deps, [...deps.train, ...deps.test].map((r) => r.text));
   const testVecs = deps.test.map((r) => vecs.get(r.text)!);
 
-  const { kept, dropped } = dropNearTest(deps.train, vecs, testVecs, 0.95);
-  const split = splitByFamily(kept, 0.2, deps.seed);
+  const { kept, dropped } = dropNearTest(deps.train, vecs, testVecs, COSINE_CUTOFF);
+  const split = splitByFamily(kept, DEV_SHARE, deps.seed);
   const X = split.train.map((r) => vecs.get(r.text)!);
   const y = split.train.map((r) => r.label);
   const devX = split.dev.map((r) => vecs.get(r.text)!);
@@ -173,23 +209,33 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
   // Router 0: keyword baseline.
   const kwDev = await routeAll(deps.keyword, split.dev);
   const kwTest = await routeAll(deps.keyword, deps.test);
-  results.push(summarize("keyword", kwTest.preds, chooseThreshold(kwDev.preds), kwTest.ms, 0));
+  results.push(summarize("keyword", deps.keyword.name, kwTest.preds, chooseThreshold(kwDev.preds), kwTest.ms, 0));
 
   // Router 2: embeddings + LR. Test predictions from the batch embeddings; latency from live single calls.
   const embedPreds = deps.test.map((r, i) => argmaxPred(model, r, testVecs[i]!));
   const live = createEmbeddingRouter(deps.embedder, model, EMBED_LR_VERSION);
   const liveRun = await routeAll(live, deps.test.slice(0, deps.latencySample));
-  const embedUsdPerCall = (Math.ceil(deps.test.reduce((n, r) => n + r.text.length, 0) / 4 / deps.test.length) * 0.15) / 1e6;
-  results.push(summarize("embed-lr", embedPreds, embedThreshold, liveRun.ms, embedUsdPerCall * embedPreds.length));
+  const embedUsd = costUsd(deps.embedder.model, estimateTokens(deps.test.map((r) => r.text)), 0);
+  results.push(summarize("embed-lr", live.name, embedPreds, embedThreshold, liveRun.ms, embedUsd));
 
-  // Router 1: Gemini zero-shot (comparison only).
+  // Router 1: Gemini zero-shot (comparison only). A SpendCapError is recorded and swallowed so keyword and
+  // embed-lr results, the model files and the report are still produced; any other error still propagates.
+  let zeroShotSkipped: string | undefined;
+  let zeroShotDevSampleSize: number | null = null;
   if (deps.zeroShot) {
-    const devSample = stratifiedSample(split.dev, deps.zeroShotDevPerGroup, deps.seed);
-    const zsDev = await routeAll(deps.zeroShot, devSample);
-    const before = deps.spent?.() ?? 0;
-    const zsTest = await routeAll(deps.zeroShot, deps.test);
-    const usd = (deps.spent?.() ?? 0) - before;
-    results.push(summarize("gemini-zeroshot", zsTest.preds, chooseThreshold(zsDev.preds), zsTest.ms, usd));
+    try {
+      const devSample = stratifiedSample(split.dev, deps.zeroShotDevPerGroup, deps.seed);
+      zeroShotDevSampleSize = devSample.length;
+      const zsDev = await routeAll(deps.zeroShot, devSample);
+      const before = deps.spent?.() ?? 0;
+      const zsTest = await routeAll(deps.zeroShot, deps.test);
+      const usd = (deps.spent?.() ?? 0) - before;
+      results.push(summarize("gemini-zeroshot", deps.zeroShot.name, zsTest.preds, chooseThreshold(zsDev.preds), zsTest.ms, usd));
+    } catch (e) {
+      if (!(e instanceof SpendCapError)) throw e;
+      zeroShotSkipped = e.message;
+      zeroShotDevSampleSize = null;
+    }
   }
 
   return {
@@ -206,5 +252,17 @@ export async function runExperiment(deps: ExperimentDeps): Promise<ExperimentRes
     routers: results,
     selected: selectRouter(results),
     model,
+    config: {
+      seed: deps.seed,
+      devShare: DEV_SHARE,
+      cosineCutoff: COSINE_CUTOFF,
+      l2Grid: deps.l2Grid ?? [1e-4, 1e-3, 1e-2],
+      epochs: deps.epochs ?? 300,
+      zeroShotDevPerGroup: deps.zeroShotDevPerGroup,
+      latencySample: deps.latencySample,
+      embedLrVersion: EMBED_LR_VERSION,
+    },
+    zeroShotSkipped,
+    zeroShotDevSampleSize,
   };
 }

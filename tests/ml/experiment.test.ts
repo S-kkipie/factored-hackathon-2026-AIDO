@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { type Utterance, loadFrozenTestSet, readUtterancesCsv } from "../../ml/dataset";
-import { type RouterResult, runExperiment, selectRouter } from "../../ml/experiment";
+import { EMBED_LR_VERSION, type RouterResult, runExperiment, selectRouter } from "../../ml/experiment";
 import { renderRouterReport } from "../../ml/report";
 import { dropNearTest, splitByFamily, stratifiedSample } from "../../ml/split";
+import type { Embedder } from "../../server/llm/embedder";
+import { SpendCapError } from "../../server/llm/metered";
 import { createKeywordRouter } from "../../server/router/keyword";
 import type { Router } from "../../server/router/types";
 import { fakeEmbedder } from "./fakes";
@@ -97,14 +99,106 @@ describe("runExperiment (fake embedder, no network)", () => {
     expect(["keyword", "embed-lr"]).toContain(r.selected.router);
     expect(r.model.labels).toHaveLength(7);
 
+    expect(r.config).toEqual({
+      seed: 7,
+      devShare: 0.2,
+      cosineCutoff: 0.95,
+      l2Grid: [1e-3],
+      epochs: 60,
+      zeroShotDevPerGroup: 2,
+      latencySample: 3,
+      embedLrVersion: EMBED_LR_VERSION,
+    });
+    expect(r.routers.find((x) => x.name === "keyword")!.version).toBe("keyword-v1");
+    expect(r.routers.find((x) => x.name === "embed-lr")!.version).toBe(`embed-lr@${EMBED_LR_VERSION}`);
+    expect(r.routers.find((x) => x.name === "gemini-zeroshot")!.version).toBe("fake-zs");
+    expect(r.zeroShotSkipped).toBeUndefined();
+    expect(r.zeroShotDevSampleSize).toBeGreaterThan(0);
+    for (const x of r.routers) expect(x.failures).toBeGreaterThanOrEqual(0);
+
     r.runId = "router-test";
     const md = renderRouterReport(r, { model: "gemini-embedding-001", trainSource: "seeds", spentUsd: 0 });
     expect(md).toContain("| keyword");
     expect(md).toContain("**(selected)**");
     expect(md).toContain("## Confusion matrix");
     expect(md).toContain("cosine > 0.95");
+    expect(md).toContain("the selection rule used test metrics (rule fixed before evaluation)");
+    expect(md).toContain(`stratified dev sample of ${r.zeroShotDevSampleSize} rows`);
 
     const again = await runExperiment({ ...deps, embedder: fakeEmbedder(96) });
     expect(again.routers.map((x) => x.test.macroF1)).toEqual(r.routers.map((x) => x.test.macroF1));
+  }, 60_000);
+});
+
+describe("runExperiment resilience (fake providers)", () => {
+  const baseDeps = async () => ({
+    test: await testSet(),
+    train: await seeds(),
+    keyword: createKeywordRouter(),
+    seed: 7,
+    zeroShotDevPerGroup: 2,
+    latencySample: 3,
+    l2Grid: [1e-3],
+    epochs: 60,
+  });
+
+  test("a SpendCapError from zero-shot is caught: keyword and embed-lr results, model and report still come out", async () => {
+    const deps = await baseDeps();
+    const zeroShot: Router = {
+      name: "fake-zs",
+      route: async () => {
+        throw new SpendCapError("run limit of $0.5 reached");
+      },
+    };
+    const r = await runExperiment({ ...deps, embedder: fakeEmbedder(96), zeroShot });
+    expect(r.routers.map((x) => x.name)).toEqual(["keyword", "embed-lr"]);
+    expect(r.zeroShotSkipped).toBeDefined();
+    expect(r.zeroShotSkipped).toContain("BUD_TOTAL");
+    expect(r.zeroShotDevSampleSize).toBeNull();
+    expect(r.model.labels).toHaveLength(7);
+
+    r.runId = "router-test-skipped";
+    const md = renderRouterReport(r, { model: "gemini-embedding-001", trainSource: "seeds", spentUsd: 0 });
+    expect(md).toContain("gemini-zeroshot was skipped");
+    expect(md).toContain("BUD_TOTAL");
+  }, 60_000);
+
+  test("a non-SpendCapError from zero-shot still propagates", async () => {
+    const deps = await baseDeps();
+    const zeroShot: Router = {
+      name: "fake-zs",
+      route: async () => {
+        throw new Error("boom");
+      },
+    };
+    await expect(runExperiment({ ...deps, embedder: fakeEmbedder(96), zeroShot })).rejects.toThrow("boom");
+  }, 60_000);
+
+  test("an embedder that fails mid-run still keeps the first chunk's vectors via onEmbedded", async () => {
+    const deps = await baseDeps();
+    const dim = 8;
+    let calls = 0;
+    const vec = () => new Array(dim).fill(1 / Math.sqrt(dim));
+    const failingEmbedder: Embedder = {
+      model: "fake-chunked",
+      dim,
+      async embed(texts) {
+        calls++;
+        if (calls === 2) throw new Error("simulated network failure");
+        return { vectors: texts.map(vec), inputTokens: texts.length };
+      },
+    };
+    const snapshots: number[] = [];
+    await expect(
+      runExperiment({
+        ...deps,
+        embedder: failingEmbedder,
+        zeroShot: null,
+        onEmbedded: (cache) => {
+          snapshots.push(cache.size);
+        },
+      }),
+    ).rejects.toThrow("simulated network failure");
+    expect(snapshots).toEqual([100]);
   }, 60_000);
 });
