@@ -18,7 +18,7 @@ Depends on plan 1 only for the `serving.sqlite` schema (tests build their own fi
 - No Python. Runtime Bun; SQLite only through `bun:sqlite`.
 - `customer_id` used by any tool must come from the JWT (`src: "jwt"`); records used to act (transactions in a dispute) must come from the database (`src: "db"`). Violations throw `ProvenanceError` with rule `PROV_001`.
 - No tool moves money, blocks cards, or approves credit. Tools only read, create dispute cases, and create handoffs.
-- Synthetic policy values (labeled as such): clock `2026-06-17`; auto-dispute max `amount_usd` 500; `fraud_score` ≥ 30 escalates; dispute age ≤ 90 days; ≥ 3 transactions in one dispute escalates; risk score ≥ 3 escalates.
+- Synthetic policy values (labeled as such): clock `2026-06-17`; auto-dispute max `amount_usd` 250 (real purchases are capped at USD 500, so 250 splits them about 50/50); `fraud_score` ≥ 30 escalates; dispute age ≤ 90 days; ≥ 3 transactions in one dispute escalates; risk score ≥ 3 escalates.
 - Budgets: 30 turns, 3 LLM calls per turn, 40,000 tokens per session, USD 5 daily spend.
 - Every gate and policy outcome carries a rule id with the prefixes `IN_`, `BUD_`, `RT_`, `SC_`, `POL_`, `PROV_`, `TL_`, `VF_`, `RS_`.
 - IDs in data: customers `CLI-…`, products `PRD-…`, transactions `TRX-…`, complaints `CMP-…`; this system creates disputes `D-…` and handoffs `H-…`.
@@ -169,7 +169,7 @@ export interface Policy {
 export const POLICY: Policy = {
   version: "2026-10-02.1",
   clock: "2026-06-17",
-  maxAutoUsd: 500,
+  maxAutoUsd: 250,
   fraudScore: 30,
   maxDisputeAgeDays: 90,
   maxTxPerDispute: 2,

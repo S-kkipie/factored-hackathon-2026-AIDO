@@ -61,7 +61,7 @@ flowchart LR
 - **One focused workflow, built deep.** The intents are `check_balance`, `list_transactions`, `explain_charge`, `dispute_charge`, `request_human` and `out_of_scope`.
 - **Policy lives in code, not in prompts.** Automatic dispute intake requires all of the following:
   - the charge is approved and belongs to the customer;
-  - it is at most 90 days old and at most USD 500;
+  - it is at most 90 days old and at most USD 250;
   - its `fraud_score` is below 30;
   - it has not been disputed before.
 

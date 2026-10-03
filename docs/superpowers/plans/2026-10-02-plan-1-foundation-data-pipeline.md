@@ -17,7 +17,7 @@ This is plan 1 of 6. Later plans: 2 core service (auth, tools, policy, graph, tr
 - All code, identifiers, comments, docs in English.
 - Runtime is Bun; no Python in the repository.
 - Simulated clock `2026-06-17`; serving window 180 days; persona "recent" window 90 days.
-- Policy thresholds used for persona selection: auto-dispute max `amount_usd` = 500; fraud threshold `fraud_score` ≥ 30.
+- Policy thresholds used for persona selection: auto-dispute max `amount_usd` = 250 (real purchases are capped at USD 500); fraud threshold `fraud_score` ≥ 30.
 - Serving subset ≈ 2,000 customers stratified by country × segment, deterministic with seed 42.
 - Never commit: `data/`, `.env`, organizer documents, `serving.sqlite`. S3 credentials only in `.env` (gitignored).
 - LLM-bound and serving data excludes document numbers, emails, phones, addresses; card/account numbers masked to last 4.
@@ -221,7 +221,7 @@ export function defaultConfig(overrides: Partial<PipelineConfig> = {}): Pipeline
     recentDays: 90,
     subsetSize: 2000,
     seed: 42,
-    maxAutoUsd: 500,
+    maxAutoUsd: 250,
     fraudScore: 30,
     ...overrides,
   };

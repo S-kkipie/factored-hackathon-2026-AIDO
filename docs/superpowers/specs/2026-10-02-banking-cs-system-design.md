@@ -37,8 +37,8 @@ Greetings and thanks are answered without tools.
 
 1. **Identity.** Demo login (demo user + PIN) issues a signed JWT, 15-minute TTL. `customer_id` comes only from the session, never from message text. Expired session → re-authentication prompt, no data access.
 2. **Data scope.** Every tool receives the session customer and checks ownership. References to other accounts or documents are denied and logged as unauthorized attempts.
-3. **Automatic dispute intake allowed only if all hold:** transaction belongs to customer; status `Approved`; age ≤ 90 days; `amount_usd` ≤ 500; `fraud_score` < 30; not already disputed.
-4. **Mandatory escalation if any holds:** `amount_usd` > 500; `fraud_score` ≥ 30 (suspected fraud; card block recommended, performed by human); ≥ 3 disputed transactions in one request; repeat complainer; customer status Suspended/Closed; explicit human request; tool failure after retries.
+3. **Automatic dispute intake allowed only if all hold:** transaction belongs to customer; status `Approved`; age ≤ 90 days; `amount_usd` ≤ 250; `fraud_score` < 30; not already disputed.
+4. **Mandatory escalation if any holds:** `amount_usd` > 250; `fraud_score` ≥ 30 (suspected fraud; card block recommended, performed by human); ≥ 3 disputed transactions in one request; repeat complainer; customer status Suspended/Closed; explicit human request; tool failure after retries.
 5. **Out-of-band confirmation** required before `create_dispute`: the graph interrupts and issues a single-use nonce; only a UI action carrying that nonce resumes the run. A typed "sí" in chat never confirms an action.
 6. **No money movement.** The system never refunds, reverses, or blocks; it only creates cases and handoffs.
 7. **Simulated clock** fixed at 2026-06-17 (last dataset date).
