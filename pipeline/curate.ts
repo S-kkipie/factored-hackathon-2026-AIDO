@@ -1,9 +1,47 @@
+import { Database } from "bun:sqlite";
 import { rm, rename } from "node:fs/promises";
 import type { PipelineConfig } from "./config";
 import type { Duck } from "./duck";
 import { lit } from "./sql";
 
 export type Persona = "normal" | "high_amount" | "fraud_suspect" | "repeat_complainer" | "suspended";
+
+/** Indexes supporting the serving query patterns (per-customer lookups, persona lookup). */
+const SERVING_INDEXES: readonly { name: string; table: string; columns: readonly string[] }[] = [
+  { name: "idx_transactions_customer_date", table: "transactions", columns: ["customer_id", "transaction_date"] },
+  { name: "idx_products_customer", table: "products", columns: ["customer_id"] },
+  { name: "idx_complaints_customer", table: "complaints", columns: ["customer_id"] },
+  { name: "idx_demo_users_persona", table: "demo_users", columns: ["persona"] },
+];
+
+/**
+ * Creates the serving indexes. Tries DuckDB's sqlite attach first; if that extension doesn't
+ * support CREATE INDEX on attached sqlite tables, falls back to opening the finished tmp file
+ * directly with bun:sqlite (after `srv` is detached, so the file isn't locked by DuckDB).
+ */
+async function createServingIndexes(duck: Duck, tmpPath: string): Promise<void> {
+  let viaDuckDb = true;
+  try {
+    for (const idx of SERVING_INDEXES) {
+      // Attached sqlite databases have a single schema ("main"); DuckDB's binder rejects the
+      // two-part "srv.<table>" form for DDL like CREATE INDEX, so qualify with it explicitly.
+      await duck.run(`create index if not exists ${idx.name} on srv.main.${idx.table} (${idx.columns.join(", ")})`);
+    }
+  } catch {
+    viaDuckDb = false;
+  }
+  await duck.run("detach srv");
+  if (!viaDuckDb) {
+    const sqliteDb = new Database(tmpPath);
+    try {
+      for (const idx of SERVING_INDEXES) {
+        sqliteDb.run(`create index if not exists ${idx.name} on ${idx.table} (${idx.columns.join(", ")})`);
+      }
+    } finally {
+      sqliteDb.close();
+    }
+  }
+}
 
 export interface CurateResult {
   customers: number;
@@ -115,7 +153,7 @@ export async function curate(duck: Duck, o: CurateOptions): Promise<CurateResult
     const counts = await duck.one<{ customers: number; transactions: number }>(`select
       (select count(*)::integer from srv.customers) as customers,
       (select count(*)::integer from srv.transactions) as transactions`);
-    await duck.run("detach srv");
+    await createServingIndexes(duck, tmpPath);
     await rename(tmpPath, o.servingPath);
     return {
       ...counts,

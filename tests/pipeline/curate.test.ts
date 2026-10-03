@@ -48,6 +48,65 @@ describe("curate", () => {
     db.close();
   });
 
+  test("creates serving indexes for common query patterns", async () => {
+    const config = await makeWorkspace();
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+    await stageAll(duck, config, "load-1");
+    await curate(duck, config);
+    duck.close();
+
+    const db = new Database(config.servingPath, { readonly: true });
+    const indexNames = db
+      .query<{ name: string }, []>("select name from sqlite_master where type = 'index'")
+      .all()
+      .map((r) => r.name);
+    for (const name of [
+      "idx_transactions_customer_date",
+      "idx_products_customer",
+      "idx_complaints_customer",
+      "idx_demo_users_persona",
+    ]) {
+      expect(indexNames).toContain(name);
+    }
+    db.close();
+  });
+
+  test("serving contract: demo_users count, meta keys, complaint flag type, transaction_date format", async () => {
+    const config = await makeWorkspace();
+    const duck = await openDuck(":memory:");
+    await ensureStagingSchema(duck);
+    await stageAll(duck, config, "load-1");
+    await curate(duck, config);
+    duck.close();
+
+    const db = new Database(config.servingPath, { readonly: true });
+
+    const demoUserCount = db.query<{ n: number }, []>("select count(*) as n from demo_users").get();
+    expect(demoUserCount?.n).toBe(5);
+
+    const metaKeys = db
+      .query<{ key: string }, []>("select key from meta order by key")
+      .all()
+      .map((r) => r.key);
+    expect(metaKeys).toEqual(["built_at", "clock", "window_days"]);
+
+    const complaintFlag = db
+      .query<{ v: unknown }, []>("select is_repeat_complainer as v from complaints where complaint_id = 'Q1'")
+      .get();
+    expect(typeof complaintFlag?.v).toBe("number");
+    expect(complaintFlag?.v === 0 || complaintFlag?.v === 1).toBe(true);
+
+    const txDates = db
+      .query<{ d: string }, []>("select transaction_date as d from transactions")
+      .all()
+      .map((r) => r.d);
+    expect(txDates.length).toBeGreaterThan(0);
+    for (const d of txDates) expect(d).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+
+    db.close();
+  });
+
   test("rejects if any persona is missing", async () => {
     const config = await makeWorkspace();
     const duck = await openDuck(":memory:");

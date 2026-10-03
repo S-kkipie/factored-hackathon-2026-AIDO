@@ -28,7 +28,11 @@ export async function ensureStagingSchema(duck: Duck): Promise<void> {
       table_name varchar, source_file varchar, size bigint, load_id varchar,
       primary key (table_name, source_file));
     create table if not exists stg._rejects (
-      table_name varchar, pk varchar, reasons varchar, source_file varchar, load_id varchar);`);
+      table_name varchar, pk varchar, reasons varchar, source_file varchar, load_id varchar);
+    create table if not exists stg._load_log (
+      load_id varchar, table_name varchar, files_loaded integer, rows_read integer,
+      rejected integer, duplicates_in_batch integer, inserted integer, updated integer,
+      missing_columns varchar, unexpected_columns varchar, loaded_at timestamp);`);
 }
 
 export async function listSourceFiles(rawDir: string, pattern: string): Promise<SourceFile[]> {
@@ -96,9 +100,6 @@ export async function stageTable(
   result.unexpectedColumns = batchColumns.filter((name) => !declared.has(name));
 
   await duck.run(`create or replace temp table _typed as ${typedSelectSql(contract, present)}`);
-  await duck.run(`insert into stg._rejects
-    select ${lit(contract.table)}, cast(${pk} as varchar), _reasons, source_file, ${lit(loadId)}
-    from _typed where _reasons <> ''`);
   await duck.run(`create or replace temp table _clean as
     select * exclude (_reasons) from _typed where _reasons = ''
     qualify row_number() over (partition by ${pk} order by source_file desc) = 1`);
@@ -120,21 +121,46 @@ export async function stageTable(
       (select count(*)::integer from _clean c where exists (select 1 from ${table} s where s.${pk} = c.${pk} and c.source_file >= s.source_file)) as updated_count`,
   );
 
-  const columns = [...contract.columns.map((c) => ident(c.name)), "source_file"].join(", ");
-  const updateCols = contract.columns.map((c) => `${ident(c.name)} = excluded.${ident(c.name)}`).join(", ");
-  await duck.run(`insert into ${table} (${columns}, load_id)
-    select ${columns}, ${lit(loadId)} from _clean
-    where not exists (select 1 from ${table} s where s.${pk} = _clean.${pk} and s.source_file > _clean.source_file)
-    on conflict (${pk}) do update set ${updateCols}, source_file = excluded.source_file, load_id = excluded.load_id`);
-  const fileRows = pending
-    .map((f) => `(${lit(contract.table)}, ${lit(relative(rawDir, f.path))}, ${f.size}, ${lit(loadId)})`)
-    .join(", ");
-  await duck.run(`insert or replace into stg._loaded_files values ${fileRows}`);
-
   result.rowsRead = counts.rows_read;
   result.rejected = counts.rejected;
   result.duplicatesInBatch = counts.valid - counts.clean;
   result.updated = counts.updated_count;
   result.inserted = counts.clean - counts.updated_count - counts.stale;
+
+  const columns = [...contract.columns.map((c) => ident(c.name)), "source_file"].join(", ");
+  const updateCols = contract.columns.map((c) => `${ident(c.name)} = excluded.${ident(c.name)}`).join(", ");
+  const pendingRelPaths = pending.map((f) => relative(rawDir, f.path));
+  const fileRows = pending
+    .map((f) => `(${lit(contract.table)}, ${lit(relative(rawDir, f.path))}, ${f.size}, ${lit(loadId)})`)
+    .join(", ");
+
+  // All per-table load writes happen atomically: a crash mid-load cannot leave
+  // stale rejects, a half-applied upsert, or a dangling _loaded_files entry.
+  await duck.run("begin transaction");
+  try {
+    // Rejects for files in this batch are recomputed from scratch; drop any
+    // earlier rejects for the same source files before inserting the new ones.
+    await duck.run(`delete from stg._rejects
+      where table_name = ${lit(contract.table)} and source_file in (${pendingRelPaths.map(lit).join(", ")})`);
+    await duck.run(`insert into stg._rejects
+      select ${lit(contract.table)}, cast(${pk} as varchar), _reasons, source_file, ${lit(loadId)}
+      from _typed where _reasons <> ''`);
+    await duck.run(`insert into ${table} (${columns}, load_id)
+      select ${columns}, ${lit(loadId)} from _clean
+      where not exists (select 1 from ${table} s where s.${pk} = _clean.${pk} and s.source_file > _clean.source_file)
+      on conflict (${pk}) do update set ${updateCols}, source_file = excluded.source_file, load_id = excluded.load_id`);
+    await duck.run(`insert or replace into stg._loaded_files values ${fileRows}`);
+    await duck.run(`insert into stg._load_log (
+        load_id, table_name, files_loaded, rows_read, rejected, duplicates_in_batch, inserted, updated,
+        missing_columns, unexpected_columns, loaded_at)
+      values (${lit(loadId)}, ${lit(contract.table)}, ${result.filesLoaded}, ${result.rowsRead}, ${result.rejected},
+        ${result.duplicatesInBatch}, ${result.inserted}, ${result.updated},
+        ${lit(result.missingColumns.join(","))}, ${lit(result.unexpectedColumns.join(","))}, now())`);
+    await duck.run("commit");
+  } catch (err) {
+    await duck.run("rollback");
+    throw err;
+  }
+
   return result;
 }

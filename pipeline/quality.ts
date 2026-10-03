@@ -2,7 +2,19 @@ import type { Contract } from "./contracts/types";
 import type { Duck } from "./duck";
 import { mdTable } from "./markdown";
 import { ident, lit } from "./sql";
-import type { StageResult } from "./stage";
+
+/** Load totals for one table, aggregated across every run recorded in stg._load_log. */
+export interface LoadHistoryRow {
+  table: string;
+  filesLoaded: number;
+  rowsRead: number;
+  rejected: number;
+  duplicatesInBatch: number;
+  inserted: number;
+  updated: number;
+  missingColumns: string[];
+  unexpectedColumns: string[];
+}
 
 export interface TableQuality {
   table: string;
@@ -69,13 +81,66 @@ export async function assessTable(duck: Duck, contract: Contract): Promise<Table
   };
 }
 
+/**
+ * Aggregates stg._load_log across every run that has ever loaded at least one file for a
+ * table, so load statistics survive beyond the current process (unlike the in-memory
+ * StageResult[] returned by a single run).
+ */
+export async function loadHistory(duck: Duck): Promise<LoadHistoryRow[]> {
+  const rows = await duck.all<{
+    table_name: string;
+    files_loaded: number;
+    rows_read: number;
+    rejected: number;
+    duplicates_in_batch: number;
+    inserted: number;
+    updated: number;
+    missing_columns: string | null;
+    unexpected_columns: string | null;
+  }>(`
+    select table_name, files_loaded::integer as files_loaded, rows_read::integer as rows_read,
+      rejected::integer as rejected, duplicates_in_batch::integer as duplicates_in_batch,
+      inserted::integer as inserted, updated::integer as updated, missing_columns, unexpected_columns
+    from stg._load_log
+    order by table_name, loaded_at`);
+
+  const byTable = new Map<string, LoadHistoryRow>();
+  for (const r of rows) {
+    const row = byTable.get(r.table_name) ?? {
+      table: r.table_name,
+      filesLoaded: 0,
+      rowsRead: 0,
+      rejected: 0,
+      duplicatesInBatch: 0,
+      inserted: 0,
+      updated: 0,
+      missingColumns: [],
+      unexpectedColumns: [],
+    };
+    row.filesLoaded += r.files_loaded;
+    row.rowsRead += r.rows_read;
+    row.rejected += r.rejected;
+    row.duplicatesInBatch += r.duplicates_in_batch;
+    row.inserted += r.inserted;
+    row.updated += r.updated;
+    for (const col of (r.missing_columns ?? "").split(",").filter(Boolean)) {
+      if (!row.missingColumns.includes(col)) row.missingColumns.push(col);
+    }
+    for (const col of (r.unexpected_columns ?? "").split(",").filter(Boolean)) {
+      if (!row.unexpectedColumns.includes(col)) row.unexpectedColumns.push(col);
+    }
+    byTable.set(r.table_name, row);
+  }
+  return [...byTable.values()];
+}
+
 export function renderQualityMarkdown(
   quality: readonly TableQuality[],
-  stages: readonly StageResult[],
+  history: readonly LoadHistoryRow[],
   runId: string,
 ): string {
   const load = mdTable(
-    stages.map((s) => ({
+    history.map((s) => ({
       table: s.table,
       files_loaded: s.filesLoaded,
       rows_read: s.rowsRead,
@@ -104,5 +169,5 @@ export function renderQualityMarkdown(
       `### Orphaned foreign keys\n\n${mdTable(q.orphans)}`,
     ].join("\n");
   });
-  return `# Data quality report\n\nRun: \`${runId}\`\n\n## Load summary (this run)\n\n${load}\n${tables.join("\n")}`;
+  return `# Data quality report\n\nRun: \`${runId}\`\n\n## Load summary (all runs)\n\n${load}\n${tables.join("\n")}`;
 }

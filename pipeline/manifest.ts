@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { ROOT } from "./config";
 import type { StageResult, SourceFile } from "./stage";
 
 export interface Manifest {
@@ -27,7 +28,7 @@ export async function sha256File(path: string): Promise<string> {
 }
 
 export function gitSha(): string | null {
-  const result = Bun.spawnSync(["git", "rev-parse", "HEAD"]);
+  const result = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: ROOT });
   return result.exitCode === 0 ? result.stdout.toString().trim() : null;
 }
 

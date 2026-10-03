@@ -6,7 +6,7 @@ import { type Persona, curate } from "./curate";
 import { openDuck } from "./duck";
 import { fingerprint, gitSha, sha256File, writeManifest } from "./manifest";
 import { buildMarts, renderDemandMarkdown } from "./marts";
-import { type TableQuality, assessTable, renderQualityMarkdown } from "./quality";
+import { type TableQuality, assessTable, loadHistory, renderQualityMarkdown } from "./quality";
 import { type StageResult, ensureStagingSchema, listSourceFiles, stageTable } from "./stage";
 
 export interface RunSummary {
@@ -38,8 +38,9 @@ export async function runPipeline(config: PipelineConfig): Promise<RunSummary> {
     const marts = await buildMarts(duck, config.martsDir);
     const quality: TableQuality[] = [];
     for (const contract of CONTRACTS) quality.push(await assessTable(duck, contract));
+    const history = await loadHistory(duck);
 
-    await Bun.write(join(config.reportsDir, "quality.md"), renderQualityMarkdown(quality, stages, runId));
+    await Bun.write(join(config.reportsDir, "quality.md"), renderQualityMarkdown(quality, history, runId));
     await Bun.write(join(config.reportsDir, "demand.md"), renderDemandMarkdown(marts));
 
     const manifestPath = await writeManifest(config.runsDir, {

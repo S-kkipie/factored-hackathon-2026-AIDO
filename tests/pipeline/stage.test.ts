@@ -133,6 +133,11 @@ describe("stageTable", () => {
     expect(t8.transaction_id).toBe("T8");
     expect(t8.source_file).toContain("day=10");
 
+    // The day=10 file still contains the invalid TX row on every reload; rejects for that
+    // source file must be replaced, not accumulated, across reloads.
+    const txRejects = await duck.one<{ n: number }>("select count(*)::integer as n from stg._rejects where pk = 'TX'");
+    expect(txRejects.n).toBe(1);
+
     duck.close();
   });
 
