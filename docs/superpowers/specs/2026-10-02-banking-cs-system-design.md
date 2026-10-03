@@ -134,7 +134,7 @@ Detection signals are logged and feed policy; no detector blocks or approves on 
 S3 raw CSV (daily partitions)
   → raw/        idempotent local mirror
   → staging     typed, contract-validated, deduplicated (DuckDB)
-       └→ rejects (row + reason)
+       └→ rejects (primary key + reasons)
   → curated
        ├→ serving.sqlite   app subset
        └→ marts/*.parquet  demand evidence and operational baseline
@@ -144,9 +144,9 @@ S3 raw CSV (daily partitions)
 - **Contracts:** one TS module per table: columns, types, nullability, enums, PK uniqueness, FKs. Violations go to `rejects` with a reason.
 - **Quality report:** duplicate rate (ID and content-level), null rates, orphans, enum violations, late-arrival lag (`process_date` vs event date), row counts vs documented.
 - **Incremental load:** per-partition watermark, idempotent upsert. A labeled test fixture (late partition + corrected row) demonstrates update correctness.
-- **Lineage:** curated rows carry `source_file` and `load_id`; manifest records input hashes and per-stage counts.
+- **Lineage:** curated rows carry `source_file` and `load_id`; manifest records input fingerprints (sha256 over relative path + size) and per-stage counts; an append-only load log keeps statistics across runs.
 - **Serving subset:** ~2,000 customers stratified by country and segment, with products, last 180 days of transactions relative to the simulated clock, and complaints. Hand-picked demo users cover: normal, high amount, high fraud score, repeat complainer, suspended.
-- **PII minimization:** LLM inputs contain only needed fields (merchant, amount, date, status); document numbers and contact data never leave the server; names masked.
+- **PII minimization:** LLM inputs contain only needed fields (merchant, amount, date, status); document numbers and contact data never reach serving.sqlite; customer names are masked in model inputs (serving keeps them for the UI). Serving tables are indexed by customer_id; `amount_usd` is null for ~2% of ARS/COP rows and policy treats null as escalate.
 - **Restricted data:** dataset files and `serving.sqlite` are never committed to the public repository.
 
 ## 6. ML component: intent router

@@ -137,6 +137,8 @@ Pipeline outputs:
 - `reports/quality.md`, `reports/demand.md`: data quality and demand reports (committed).
 - `data/runs/<run_id>/manifest.json`: lineage (input fingerprints, per-stage counts, output hash).
 
+`serving.sqlite` contract (read by the server): tables `customers`, `products` (`product_number_masked`), `transactions` (ISO `transaction_date`, `amount_usd` derived for USD rows and null for ~2% of ARS/COP rows, no `is_fraud`), `complaints` (`is_repeat_complainer` 0/1), `demo_users`, `meta` (`clock`, `window_days`, `built_at`).
+
 ## Roadmap
 
 | Plan | Scope | Status |

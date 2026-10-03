@@ -38,6 +38,10 @@ Source: organizer S3 `data/` prefix, read with DuckDB over hive-partitioned CSVs
 - is_fraud 0.10%, independent of type, channel, status, merchant category, foreign country.
 - `fraud_score` ≥ 40 → is_fraud 100%; < 30 → 0.03% → label leaks through score; deterministic threshold, not a learning problem.
 
+## Arrival lag
+- `process_date` minus event date: avg −0.25 days, min −1, max 0 in every partitioned table → no real late arrivals; incremental-load correctness is demonstrated with a labeled test fixture (late partition + corrected row).
+- Purchases and withdrawals are capped at USD 500 → synthetic auto-dispute limit set to USD 250.
+
 ## Implications
 - Usable as evidence: contact mix by reason, complaint mix, FCR/duration gap of complaints, SLA/resolution time.
 - Not usable for supervised NLP (intent labels random wrt text, 2 base intents).
