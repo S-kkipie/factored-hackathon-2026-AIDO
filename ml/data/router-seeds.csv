@@ -1,0 +1,169 @@
+id,lang,variant,label,text,family
+S001,es,MX,check_balance,¿Cuál es el saldo actual de mi cuenta de cheques?,es-bal-1
+S002,es,CO,check_balance,Quisiera conocer el saldo de mi cuenta,es-bal-1
+S003,es,AR,check_balance,¿Cuánto me queda disponible para gastar con la tarjeta?,es-bal-2
+S004,es,MX,check_balance,dime cuánto crédito disponible tengo todavía,es-bal-2
+S005,es,CO,check_balance,¿Cuánto le debo al banco en la tarjeta de crédito?,es-bal-3
+S006,es,AR,check_balance,cuál es la deuda actual de mi tarjeta,es-bal-3
+S007,es,MX,check_balance,¿Ya se reflejó mi depósito? quiero ver cuánto tengo,es-bal-4
+S008,es,CO,check_balance,revisa si ya tengo saldo después de la transferencia que me hicieron,es-bal-4
+S009,es,AR,check_balance,necesito el saldo de todas mis cuentas y tarjetas,es-bal-5
+S010,es,MX,check_balance,muéstrame cuánto hay en cada una de mis cuentas,es-bal-5
+S011,es,CO,check_balance,¿cuánto me falta por pagar del crédito de libre inversión?,es-bal-6
+S012,es,AR,check_balance,¿qué saldo pendiente tiene mi préstamo?,es-bal-6
+S013,es,MX,list_transactions,enséñame los últimos cargos de mi tarjeta,es-lst-1
+S014,es,AR,list_transactions,quiero ver mis movimientos más recientes,es-lst-1
+S015,es,CO,list_transactions,¿qué compras hice en el supermercado durante abril?,es-lst-2
+S016,es,MX,list_transactions,lista lo que pagué en restaurantes el mes pasado,es-lst-2
+S017,es,AR,list_transactions,mostrame los retiros de efectivo de esta semana,es-lst-3
+S018,es,CO,list_transactions,¿cuántos retiros en cajero hice en mayo?,es-lst-3
+S019,es,MX,list_transactions,quiero ver todas las compras mayores a 200 dólares,es-lst-4
+S020,es,AR,list_transactions,filtrá los gastos de más de cincuenta dólares,es-lst-4
+S021,es,CO,list_transactions,necesito el detalle de transacciones entre el 3 y el 20 de mayo,es-lst-5
+S022,es,MX,list_transactions,dame mi historial de movimientos del primer trimestre,es-lst-5
+S023,es,AR,list_transactions,¿cuánto gasté en Uber este mes? quiero ver cada viaje,es-lst-6
+S024,es,CO,list_transactions,muéstrame todos los pagos que le hice a Spotify,es-lst-6
+S025,es,MX,explain_charge,¿qué es el cargo que dice CLIP*TIENDA en mi estado de cuenta?,es-exp-1
+S026,es,CO,explain_charge,no sé a qué corresponde un cobro que dice PSE*PAGO,es-exp-1
+S027,es,AR,explain_charge,¿por qué una compra figura como pendiente desde hace días?,es-exp-2
+S028,es,MX,explain_charge,"tengo un cargo en tránsito que no se ha aplicado, ¿qué significa?",es-exp-2
+S029,es,CO,explain_charge,¿por qué me rechazaron el pago en la tienda?,es-exp-3
+S030,es,AR,explain_charge,"me declinaron la tarjeta en el super, ¿qué pasó con esa operación?",es-exp-3
+S031,es,MX,explain_charge,¿qué quiere decir que un movimiento esté revertido?,es-exp-4
+S032,es,CO,explain_charge,"un pago me aparece reversado, explíqueme por favor",es-exp-4
+S033,es,AR,explain_charge,¿de qué comercio es el consumo de 18 dólares del martes?,es-exp-5
+S034,es,MX,explain_charge,ayúdame a identificar un cargo de 64 dólares del viernes,es-exp-5
+S035,es,CO,explain_charge,¿por qué un cobro sale en dólares si compré en pesos?,es-exp-6
+S036,es,AR,explain_charge,quiero saber por qué una compra figura como hecha en el exterior,es-exp-6
+S037,es,MX,dispute_charge,hay un cargo en mi tarjeta que yo nunca hice,es-dsp-1
+S038,es,AR,dispute_charge,"no reconozco esa compra, yo no la hice",es-dsp-1
+S039,es,CO,dispute_charge,me cobraron doble el mismo pedido de comida,es-dsp-2
+S040,es,MX,dispute_charge,"aparece repetido el cargo de la gasolinera, me lo cobraron dos veces",es-dsp-2
+S041,es,AR,dispute_charge,el monto que me debitaron no es el que pagué,es-dsp-3
+S042,es,CO,dispute_charge,"me cobraron 80 cuando la cuenta era de 8, quiero reclamar",es-dsp-3
+S043,es,MX,dispute_charge,quiero levantar una aclaración por un cargo no reconocido,es-dsp-4
+S044,es,AR,dispute_charge,quiero iniciar un reclamo por un consumo que no reconozco,es-dsp-4
+S045,es,CO,dispute_charge,"creo que clonaron mi tarjeta, hay compras que no son mías",es-dsp-5
+S046,es,MX,dispute_charge,"alguien hizo compras en línea con mis datos, no fui yo",es-dsp-5
+S047,es,AR,dispute_charge,quiero desconocer la transacción TRX-9QZ1B2C3D4E5F6G7H8J9K0,es-dsp-6
+S048,es,CO,dispute_charge,disputar el movimiento TRX-7MN4P5Q6R7S8T9U0V1W2X3 por favor,es-dsp-6
+S049,es,MX,request_human,"comunícame con un asesor, por favor",es-hum-1
+S050,es,AR,request_human,quiero que me atienda un representante,es-hum-1
+S051,es,CO,request_human,"no me está entendiendo, quiero hablar con una persona",es-hum-2
+S052,es,MX,request_human,"esto no me sirve, pásame con alguien real",es-hum-2
+S053,es,AR,request_human,necesito un operador humano urgente,es-hum-3
+S054,es,CO,request_human,"deme un agente ya, es una emergencia",es-hum-3
+S055,es,MX,request_human,¿hay algún ejecutivo disponible?,es-hum-4
+S056,es,AR,request_human,¿me puede llamar alguien del banco?,es-hum-4
+S057,es,CO,request_human,quiero escalar mi caso con un supervisor,es-hum-5
+S058,es,MX,request_human,quiero poner una queja con un gerente,es-hum-5
+S059,es,AR,request_human,humano por favor,es-hum-6
+S060,es,CO,request_human,asesor,es-hum-6
+S061,es,MX,out_of_scope,quiero sacar un crédito hipotecario,es-oos-1
+S062,es,CO,out_of_scope,¿me aprueban una tarjeta de crédito nueva?,es-oos-1
+S063,es,AR,out_of_scope,la aplicación se cierra sola cuando entro,es-oos-2
+S064,es,MX,out_of_scope,no me llega el código de verificación al celular,es-oos-2
+S065,es,CO,out_of_scope,¿dónde queda el cajero más cercano?,es-oos-3
+S066,es,AR,out_of_scope,¿cuál es el horario de atención de la sucursal del centro?,es-oos-3
+S067,es,MX,out_of_scope,"me robaron la tarjeta, bloquéenla",es-oos-4
+S068,es,CO,out_of_scope,quiero cancelar mi tarjeta de débito,es-oos-4
+S069,es,AR,out_of_scope,quiero mandarle plata a mi hermano,es-oos-5
+S070,es,MX,out_of_scope,necesito pagar un servicio de luz desde aquí,es-oos-5
+S071,es,CO,out_of_scope,¿qué me recomiendan para ahorrar para el retiro?,es-oos-6
+S072,es,AR,out_of_scope,contame un chiste,es-oos-6
+S073,es,MX,greeting,"hola, buenas tardes",es-grt-1
+S074,es,CO,greeting,"buenas noches, ¿qué tal?",es-grt-1
+S075,es,AR,greeting,holis,es-grt-2
+S076,es,MX,greeting,buenas,es-grt-2
+S077,es,CO,greeting,gracias por todo,es-grt-3
+S078,es,AR,greeting,te agradezco mucho,es-grt-3
+S079,es,MX,greeting,"muy bien, gracias",es-grt-4
+S080,es,CO,greeting,"vale, gracias, que tenga buen día",es-grt-4
+S081,es,AR,greeting,saludos,es-grt-5
+S082,es,MX,greeting,"qué tal, buenos días",es-grt-5
+S083,es,CO,greeting,"eso es todo, gracias",es-grt-6
+S084,es,AR,greeting,"genial, mil gracias",es-grt-6
+S085,pt,BR,check_balance,qual o saldo atual da minha conta?,pt-bal-1
+S086,pt,BR,check_balance,gostaria de saber quanto tenho na conta,pt-bal-1
+S087,pt,BR,check_balance,quanto ainda posso gastar no cartão de crédito?,pt-bal-2
+S088,pt,BR,check_balance,me diz o limite que sobrou no cartão,pt-bal-2
+S089,pt,BR,check_balance,qual é o valor da minha fatura atual?,pt-bal-3
+S090,pt,BR,check_balance,quanto estou devendo no cartão de crédito?,pt-bal-3
+S091,pt,BR,check_balance,o depósito já entrou? quero ver o saldo,pt-bal-4
+S092,pt,BR,check_balance,confere se a transferência que recebi já caiu na conta,pt-bal-4
+S093,pt,BR,check_balance,mostra o saldo de todas as minhas contas e cartões,pt-bal-5
+S094,pt,BR,check_balance,quanto tem em cada uma das minhas contas?,pt-bal-5
+S095,pt,BR,check_balance,quanto falta pra quitar meu empréstimo?,pt-bal-6
+S096,pt,BR,check_balance,qual o saldo devedor do financiamento pessoal?,pt-bal-6
+S097,pt,BR,list_transactions,mostra as últimas transações do meu cartão,pt-lst-1
+S098,pt,BR,list_transactions,quero ver minhas movimentações recentes,pt-lst-1
+S099,pt,BR,list_transactions,quais compras fiz no mercado em abril?,pt-lst-2
+S100,pt,BR,list_transactions,lista o que paguei em restaurantes mês passado,pt-lst-2
+S101,pt,BR,list_transactions,me mostra os saques desta semana,pt-lst-3
+S102,pt,BR,list_transactions,quantos saques no caixa eu fiz em maio?,pt-lst-3
+S103,pt,BR,list_transactions,quero ver todas as compras acima de 200 dólares,pt-lst-4
+S104,pt,BR,list_transactions,filtra os gastos maiores que cinquenta dólares,pt-lst-4
+S105,pt,BR,list_transactions,preciso do detalhamento das transações entre 3 e 20 de maio,pt-lst-5
+S106,pt,BR,list_transactions,me passa o histórico de movimentações do primeiro trimestre,pt-lst-5
+S107,pt,BR,list_transactions,quanto gastei com 99 esse mês? quero ver cada corrida,pt-lst-6
+S108,pt,BR,list_transactions,mostra todos os pagamentos que fiz pro Spotify,pt-lst-6
+S109,pt,BR,explain_charge,o que é a cobrança escrito PAGSEGURO*LOJA na fatura?,pt-exp-1
+S110,pt,BR,explain_charge,não sei a que se refere um débito chamado MP*PAGAMENTO,pt-exp-1
+S111,pt,BR,explain_charge,por que uma compra está pendente há dias?,pt-exp-2
+S112,pt,BR,explain_charge,"tem uma transação em processamento que não foi lançada, o que significa?",pt-exp-2
+S113,pt,BR,explain_charge,por que meu pagamento foi negado na loja?,pt-exp-3
+S114,pt,BR,explain_charge,"recusaram meu cartão no mercado, o que houve com essa compra?",pt-exp-3
+S115,pt,BR,explain_charge,o que quer dizer uma transação estornada?,pt-exp-4
+S116,pt,BR,explain_charge,"um pagamento aparece como revertido, me explica por favor",pt-exp-4
+S117,pt,BR,explain_charge,de qual loja é a compra de 18 dólares de terça?,pt-exp-5
+S118,pt,BR,explain_charge,me ajuda a identificar uma cobrança de 64 dólares de sexta,pt-exp-5
+S119,pt,BR,explain_charge,por que a cobrança veio em dólar se comprei em reais?,pt-exp-6
+S120,pt,BR,explain_charge,quero saber por que uma compra aparece como feita no exterior,pt-exp-6
+S121,pt,BR,dispute_charge,tem uma cobrança no meu cartão que eu nunca fiz,pt-dsp-1
+S122,pt,BR,dispute_charge,"não reconheço essa compra, não fui eu",pt-dsp-1
+S123,pt,BR,dispute_charge,cobraram duas vezes o mesmo pedido de comida,pt-dsp-2
+S124,pt,BR,dispute_charge,"apareceu repetida a cobrança do posto, cobraram em dobro",pt-dsp-2
+S125,pt,BR,dispute_charge,o valor debitado não é o que eu paguei,pt-dsp-3
+S126,pt,BR,dispute_charge,"cobraram 80 sendo que a conta era 8, quero reclamar",pt-dsp-3
+S127,pt,BR,dispute_charge,quero abrir uma contestação de compra não reconhecida,pt-dsp-4
+S128,pt,BR,dispute_charge,quero registrar uma reclamação de uma compra que não reconheço,pt-dsp-4
+S129,pt,BR,dispute_charge,"acho que clonaram meu cartão, tem compras que não são minhas",pt-dsp-5
+S130,pt,BR,dispute_charge,"alguém fez compras online com meus dados, não fui eu",pt-dsp-5
+S131,pt,BR,dispute_charge,quero contestar a transação TRX-9QZ1B2C3D4E5F6G7H8J9K0,pt-dsp-6
+S132,pt,BR,dispute_charge,contestar o lançamento TRX-7MN4P5Q6R7S8T9U0V1W2X3 por favor,pt-dsp-6
+S133,pt,BR,request_human,"me conecta com um atendente, por favor",pt-hum-1
+S134,pt,BR,request_human,quero ser atendido por um representante,pt-hum-1
+S135,pt,BR,request_human,"você não está me entendendo, quero falar com uma pessoa",pt-hum-2
+S136,pt,BR,request_human,"isso não resolve, me passa pra alguém de verdade",pt-hum-2
+S137,pt,BR,request_human,preciso de um atendente humano urgente,pt-hum-3
+S138,pt,BR,request_human,"me dá um atendente agora, é emergência",pt-hum-3
+S139,pt,BR,request_human,tem algum gerente disponível?,pt-hum-4
+S140,pt,BR,request_human,alguém do banco pode me ligar?,pt-hum-4
+S141,pt,BR,request_human,quero escalar meu caso para um supervisor,pt-hum-5
+S142,pt,BR,request_human,quero fazer uma reclamação com o gerente,pt-hum-5
+S143,pt,BR,request_human,humano por favor,pt-hum-6
+S144,pt,BR,request_human,falar com atendente,pt-hum-6
+S145,pt,BR,out_of_scope,quero fazer um financiamento imobiliário,pt-oos-1
+S146,pt,BR,out_of_scope,vocês aprovam um cartão de crédito novo pra mim?,pt-oos-1
+S147,pt,BR,out_of_scope,o app fecha sozinho quando eu entro,pt-oos-2
+S148,pt,BR,out_of_scope,não chega o código de verificação no celular,pt-oos-2
+S149,pt,BR,out_of_scope,onde fica o caixa eletrônico mais perto?,pt-oos-3
+S150,pt,BR,out_of_scope,qual o horário de funcionamento da agência do centro?,pt-oos-3
+S151,pt,BR,out_of_scope,"roubaram meu cartão, bloqueiem por favor",pt-oos-4
+S152,pt,BR,out_of_scope,quero cancelar meu cartão de débito,pt-oos-4
+S153,pt,BR,out_of_scope,quero mandar dinheiro pro meu irmão,pt-oos-5
+S154,pt,BR,out_of_scope,preciso pagar a conta de luz por aqui,pt-oos-5
+S155,pt,BR,out_of_scope,o que vocês recomendam pra guardar dinheiro pra aposentadoria?,pt-oos-6
+S156,pt,BR,out_of_scope,me conta uma piada,pt-oos-6
+S157,pt,BR,greeting,"olá, boa tarde",pt-grt-1
+S158,pt,BR,greeting,"boa noite, tudo certo?",pt-grt-1
+S159,pt,BR,greeting,oii,pt-grt-2
+S160,pt,BR,greeting,opa,pt-grt-2
+S161,pt,BR,greeting,obrigado por tudo,pt-grt-3
+S162,pt,BR,greeting,agradeço muito,pt-grt-3
+S163,pt,BR,greeting,"tudo bem, obrigada",pt-grt-4
+S164,pt,BR,greeting,"certo, obrigado, tenha um bom dia",pt-grt-4
+S165,pt,BR,greeting,saudações,pt-grt-5
+S166,pt,BR,greeting,"e aí, bom dia",pt-grt-5
+S167,pt,BR,greeting,"é só isso, obrigado",pt-grt-6
+S168,pt,BR,greeting,"show, valeu demais",pt-grt-6
