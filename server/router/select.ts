@@ -13,6 +13,8 @@ export interface RouterSetup {
   modelPath: string;
   /** Metered embedder, or null when there is no model API key. */
   embedder: Embedder | null;
+  /** Why the embedder is unavailable (e.g., "SAFE_MODE disables model calls" or "no GEMINI_API_KEY"). */
+  unavailableReason?: string;
 }
 
 /**
@@ -30,8 +32,8 @@ export function createConfiguredRouter(s: RouterSetup): { router: Router; reason
     reason = `selected by experiment ${sel.runId ?? "unknown"}`;
   }
   if (want === "keyword") return { router: createKeywordRouter(), reason };
-  if (!s.embedder) return { router: createKeywordRouter(), reason: "embed-lr needs GEMINI_API_KEY; keyword baseline" };
-  if (!existsSync(s.modelPath)) return { router: createKeywordRouter(), reason: "embed-lr model file missing; keyword baseline" };
+  if (!s.embedder) return { router: createKeywordRouter(), reason: `${reason}; embed-lr unavailable (${s.unavailableReason ?? "no embedder"}); keyword baseline` };
+  if (!existsSync(s.modelPath)) return { router: createKeywordRouter(), reason: `${reason}; embed-lr model file missing; keyword baseline` };
   const raw = JSON.parse(readFileSync(s.modelPath, "utf8")) as { version?: string };
   return { router: createEmbeddingRouter(s.embedder, parseLogRegModel(raw), raw.version ?? "unknown"), reason };
 }

@@ -166,6 +166,8 @@ bun run train         # keyword vs Gemini zero-shot vs embeddings + logistic reg
 
 The test set (`ml/data/router-test.csv`, 237 hand-written ES/PT utterances) is frozen by hash before any model selection; training data is team-generated (hand-written seeds in `ml/data/router-seeds.csv` expanded by Gemini) and labeled as synthetic. `bun run train` writes `experiments/<run_id>.json`, `reports/router.md`, `ml/models/router-embed-lr.json` and `ml/models/router-selection.json`; the server's `ROUTER=auto` (default) follows that selection, `ROUTER=keyword|embed-lr` overrides it. Both scripts respect the project spend cap plus `ML_RUN_LIMIT_USD` (default `0.5`) per run; embeddings are cached in `data/ml-cache/`.
 
+At runtime, the router's embedding calls are not chat calls: they bypass per-turn call counters and session/daily chat budgets, and are metered only by the project spend ledger (`LLM_TOTAL_CAP_USD`). Each router embedding costs about USD 0.000002.
+
 Pipeline outputs:
 - `data/serving.sqlite`: customer subset and demo personas used by the app (not committed).
 - `data/marts/*.parquet`: demand evidence.

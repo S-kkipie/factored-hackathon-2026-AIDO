@@ -41,6 +41,18 @@ describe("runtime router selection", () => {
     expect(createConfiguredRouter({ choice: "embed-lr", ...files(), embedder: fakeEmbedder(8) }).reason).toContain("model file missing");
   });
 
+  test("when auto selects embed-lr but embedder is unavailable, reason contains both run id and unavailable reason", () => {
+    const r = createConfiguredRouter({
+      choice: "auto",
+      ...files({ router: "embed-lr", runId: "run-42" }, model(8)),
+      embedder: null,
+      unavailableReason: "SAFE_MODE disables model calls",
+    });
+    expect(r.router.name).toBe("keyword-v1");
+    expect(r.reason).toContain("run-42");
+    expect(r.reason).toContain("SAFE_MODE disables model calls");
+  });
+
   test("an unknown selection or a corrupt model fails loudly", () => {
     expect(() => createConfiguredRouter({ choice: "auto", ...files({ router: "gemini-zeroshot" }), embedder: null })).toThrow("unknown selected router");
     expect(() => createConfiguredRouter({ choice: "embed-lr", ...files(undefined, { bad: 1 }), embedder: fakeEmbedder(8) })).toThrow("schema");
