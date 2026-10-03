@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { Param, Sql } from "./sql";
 
 export interface Customer {
   customer_id: string;
@@ -66,78 +66,59 @@ export interface TxFilter {
 }
 
 export interface ServingDb {
-  customer(customerId: string): Customer | null;
-  products(customerId: string): Product[];
-  transactions(customerId: string, filter?: TxFilter): Transaction[];
-  transaction(customerId: string, transactionId: string): Transaction | null;
-  complaints(customerId: string): Complaint[];
-  demoUsers(): { persona: string; customer_id: string }[];
-  close(): void;
+  customer(customerId: string): Promise<Customer | null>;
+  products(customerId: string): Promise<Product[]>;
+  transactions(customerId: string, filter?: TxFilter): Promise<Transaction[]>;
+  transaction(customerId: string, transactionId: string): Promise<Transaction | null>;
+  complaints(customerId: string): Promise<Complaint[]>;
+  demoUsers(): Promise<{ persona: string; customer_id: string }[]>;
 }
 
 const TX_COLUMNS = `transaction_id, transaction_date, product_id, customer_id, transaction_type, transaction_category,
   amount, currency, amount_usd, channel, merchant_name, merchant_category, transaction_country, transaction_city,
   transaction_status, response_code, fraud_score`;
 
-type Params = Record<string, string | number>;
-
-export function openServing(path: string): ServingDb {
-  const db = new Database(path, { readonly: true });
+/** Read-only access to the `serving` schema. Every lookup is keyed by the session customer. */
+export function openServing(sql: Sql): ServingDb {
   return {
     customer: (customerId) =>
-      db
-        .query<Customer, [string]>(
-          "select customer_id, first_name, last_name, country, segment, customer_status, detected_accent from customers where customer_id = ?",
-        )
-        .get(customerId),
+      sql.one<Customer>(
+        "select customer_id, first_name, last_name, country, segment, customer_status, detected_accent from serving.customers where customer_id = $1",
+        [customerId],
+      ),
     products: (customerId) =>
-      db
-        .query<Product, [string]>(
-          "select product_id, customer_id, product_type, product_number_masked, currency, current_balance, credit_limit, product_status from products where customer_id = ? order by product_id",
-        )
-        .all(customerId),
+      sql.all<Product>(
+        "select product_id, customer_id, product_type, product_number_masked, currency, current_balance, credit_limit, product_status from serving.products where customer_id = $1 order by product_id",
+        [customerId],
+      ),
     transactions(customerId, filter = {}) {
-      const where = ["customer_id = $customer"];
-      const params: Params = { $customer: customerId, $limit: filter.limit ?? 50 };
-      if (filter.from) {
-        where.push("transaction_date >= $from");
-        params.$from = filter.from;
-      }
-      if (filter.to) {
-        where.push("transaction_date < $to");
-        params.$to = filter.to;
-      }
-      if (filter.merchant) {
-        where.push("lower(merchant_name) like $merchant");
-        params.$merchant = `%${filter.merchant.toLowerCase()}%`;
-      }
-      if (filter.minUsd !== undefined) {
-        where.push("amount_usd >= $minUsd");
-        params.$minUsd = filter.minUsd;
-      }
-      if (filter.maxUsd !== undefined) {
-        where.push("amount_usd <= $maxUsd");
-        params.$maxUsd = filter.maxUsd;
-      }
-      return db
-        .query<Transaction, Params>(
-          `select ${TX_COLUMNS} from transactions where ${where.join(" and ")} order by transaction_date desc limit $limit`,
-        )
-        .all(params);
+      const params: Param[] = [customerId];
+      const where = ["customer_id = $1"];
+      const add = (clause: (n: string) => string, value: Param) => {
+        params.push(value);
+        where.push(clause(`$${params.length}`));
+      };
+      if (filter.from) add((n) => `transaction_date >= ${n}`, filter.from);
+      if (filter.to) add((n) => `transaction_date < ${n}`, filter.to);
+      if (filter.merchant) add((n) => `lower(merchant_name) like ${n}`, `%${filter.merchant.toLowerCase()}%`);
+      if (filter.minUsd !== undefined) add((n) => `amount_usd >= ${n}`, filter.minUsd);
+      if (filter.maxUsd !== undefined) add((n) => `amount_usd <= ${n}`, filter.maxUsd);
+      params.push(Math.trunc(filter.limit ?? 50));
+      return sql.all<Transaction>(
+        `select ${TX_COLUMNS} from serving.transactions where ${where.join(" and ")} order by transaction_date desc, transaction_id limit $${params.length}`,
+        params,
+      );
     },
     transaction: (customerId, transactionId) =>
-      db
-        .query<Transaction, [string, string]>(
-          `select ${TX_COLUMNS} from transactions where customer_id = ? and transaction_id = ?`,
-        )
-        .get(customerId, transactionId),
+      sql.one<Transaction>(`select ${TX_COLUMNS} from serving.transactions where customer_id = $1 and transaction_id = $2`, [
+        customerId,
+        transactionId,
+      ]),
     complaints: (customerId) =>
-      db
-        .query<Complaint, [string]>(
-          "select complaint_id, customer_id, creation_date, category, subcategory, status, claimed_amount, currency, is_repeat_complainer, affected_product_id from complaints where customer_id = ? order by creation_date desc",
-        )
-        .all(customerId),
-    demoUsers: () => db.query<{ persona: string; customer_id: string }, []>("select persona, customer_id from demo_users").all(),
-    close: () => db.close(),
+      sql.all<Complaint>(
+        "select complaint_id, customer_id, creation_date, category, subcategory, status, claimed_amount, currency, is_repeat_complainer, affected_product_id from serving.complaints where customer_id = $1 order by creation_date desc",
+        [customerId],
+      ),
+    demoUsers: () => sql.all<{ persona: string; customer_id: string }>("select persona, customer_id from serving.demo_users order by persona"),
   };
 }

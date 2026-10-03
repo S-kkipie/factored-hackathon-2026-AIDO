@@ -1,39 +1,39 @@
-import type { Database } from "bun:sqlite";
+import type { Sql } from "../db/sql";
 import { BUDGETS, type Budgets } from "../policy/config";
 import type { RuleIdWithPrefix } from "../rules";
 
 export type BudgetRule = Exclude<RuleIdWithPrefix<"BUD">, "BUD_CALLS">;
 
-export function checkBudget(
-  ops: Database,
+export async function checkBudget(
+  ops: Sql,
   sessionId: string,
   day: string,
   budgets: Budgets = BUDGETS,
-): { ok: true } | { ok: false; ruleId: BudgetRule } {
-  const s = ops
-    .query<{ turns: number; tokens: number; status: string }, [string]>(
-      "select turns, tokens, status from sessions where session_id = ?",
-    )
-    .get(sessionId);
+): Promise<{ ok: true } | { ok: false; ruleId: BudgetRule }> {
+  const s = await ops.one<{ turns: number; tokens: number; status: string }>(
+    "select turns, tokens, status from ops.sessions where session_id = $1",
+    [sessionId],
+  );
   if (!s || s.status !== "active") return { ok: false, ruleId: "BUD_SESSION" };
   if (s.turns >= budgets.maxTurns) return { ok: false, ruleId: "BUD_TURNS" };
   if (s.tokens >= budgets.maxTokensPerSession) return { ok: false, ruleId: "BUD_TOKENS" };
-  const spent = ops.query<{ usd: number }, [string]>("select usd from spend where day = ?").get(day)?.usd ?? 0;
+  const spent = (await ops.one<{ usd: number }>("select usd from ops.spend where day = $1", [day]))?.usd ?? 0;
   if (spent >= budgets.dailySpendUsd) return { ok: false, ruleId: "BUD_SPEND" };
   return { ok: true };
 }
 
-export function recordTurn(ops: Database, sessionId: string): void {
-  const changed = ops.query("update sessions set turns = turns + 1 where session_id = ?").run(sessionId).changes;
+export async function recordTurn(ops: Sql, sessionId: string): Promise<void> {
+  const changed = await ops.run("update ops.sessions set turns = turns + 1 where session_id = $1", [sessionId]);
   if (changed === 0) throw new Error(`BUD_SESSION: unknown session ${sessionId}`);
 }
 
-export function recordUsage(ops: Database, sessionId: string, day: string, tokens: number, usd: number): void {
-  const changed = ops.query("update sessions set tokens = tokens + ? where session_id = ?").run(tokens, sessionId).changes;
+export async function recordUsage(ops: Sql, sessionId: string, day: string, tokens: number, usd: number): Promise<void> {
+  const changed = await ops.run("update ops.sessions set tokens = tokens + $1 where session_id = $2", [tokens, sessionId]);
   if (changed === 0) throw new Error(`BUD_SESSION: unknown session ${sessionId}`);
-  ops
-    .query("insert into spend (day, usd) values (?, ?) on conflict (day) do update set usd = usd + excluded.usd")
-    .run(day, usd);
+  await ops.run(
+    "insert into ops.spend (day, usd) values ($1, $2) on conflict (day) do update set usd = ops.spend.usd + excluded.usd",
+    [day, usd],
+  );
 }
 
 export class BudgetError extends Error {

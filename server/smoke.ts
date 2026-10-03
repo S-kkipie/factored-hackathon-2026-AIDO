@@ -1,12 +1,10 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { createServer } from "./main";
 
 /**
- * End-to-end smoke run over real serving data: logs in each demo persona, sends scripted ES/PT turns through the
- * HTTP + AG-UI surface and prints outcome, rule ids and reply. Uses Gemini when GEMINI_API_KEY is set, otherwise
- * the template-only mode. Writes to a throwaway ops.sqlite.
+ * End-to-end smoke run over the configured database (DATABASE_URL, or local PGlite seeded with `bun run seed:demo`):
+ * logs in each demo persona, sends scripted ES/PT turns through the HTTP + AG-UI surface and prints outcome, rule
+ * ids and reply. Uses Gemini when GEMINI_API_KEY is set, otherwise the template-only mode. Writes sessions, audit
+ * events and spans to the same database, like real traffic.
  */
 const TURNS: [persona: string, language: "es" | "pt", text: string][] = [
   ["normal", "es", "Hola"],
@@ -23,9 +21,8 @@ const TURNS: [persona: string, language: "es" | "pt", text: string][] = [
 const env: Record<string, string | undefined> = {
   ...process.env,
   JWT_SECRET: process.env.JWT_SECRET ?? "smoke-secret-smoke-secret-smoke-secret",
-  OPS_PATH: join(mkdtempSync(join(tmpdir(), "aido-smoke-")), "ops.sqlite"),
 };
-const { app, llm } = createServer(env);
+const { app, llm, db } = await createServer(env);
 console.log(`model: ${llm?.model ?? "none"}`);
 
 for (const [persona, language, text] of TURNS) {
@@ -56,3 +53,4 @@ for (const [persona, language, text] of TURNS) {
   console.log(`  outcome=${String(get("/outcome"))} rules=${JSON.stringify(get("/ruleIds"))} run=${finished?.type}`);
   console.log(`  ${(reply || finished?.interrupts?.[0]?.message || "").replace(/\n/g, "\n  ")}`);
 }
+await db.close();

@@ -4,11 +4,12 @@ import type { Transaction } from "../../server/db/serving";
 import { openServing } from "../../server/db/serving";
 import { type PolicyInput, decide } from "../../server/policy/rules";
 import { type Source, val } from "../../server/provenance";
-import { FIXTURE, makeServing } from "./fixtures";
+import { FIXTURE, makeDb } from "./fixtures";
 
-const serving = openServing(makeServing());
-const customer = serving.customer(FIXTURE.normal)!;
-const raw = (id: string) => serving.transaction(FIXTURE.normal, id)!;
+const serving = openServing(await makeDb());
+const customer = (await serving.customer(FIXTURE.normal))!;
+const rows = new Map((await serving.transactions(FIXTURE.normal)).map((t) => [t.transaction_id, t]));
+const raw = (id: string) => rows.get(id)!;
 const tx = (id: string) => val(raw(id), "db");
 const txWith = (over: Partial<Transaction>, src: Source = "db") => val({ ...raw(FIXTURE.txSmall), ...over }, src);
 
@@ -41,18 +42,18 @@ describe("decide", () => {
     ],
     ["repeat complainer escalates", base({ targets: [tx(FIXTURE.txSmall)], repeatComplainer: true }), "escalate", ["POL_REPEAT"]],
     ["high risk escalates", base({ intent: "check_balance", riskScore: 3 }), "escalate", ["POL_RISK"]],
-  ] as const)("%s", (_, input, action, ruleIds) => {
+  ] as const)("%s", async (_, input, action, ruleIds) => {
     expect(decide(input)).toEqual({ action, ruleIds: [...ruleIds], policyVersion: POLICY.version });
   });
 
-  test("accumulates every escalation reason", () => {
+  test("accumulates every escalation reason", async () => {
     const d = decide(base({ targets: [tx(FIXTURE.txLarge), tx(FIXTURE.txFraud), tx(FIXTURE.txSmall)] }));
     expect(d.action).toBe("escalate");
     expect(d.ruleIds).toEqual(["POL_DSP_AMOUNT", "POL_DSP_FRAUD", "POL_DSP_MANY"]);
   });
 
-  test("suspended customers escalate even for reads", () => {
-    const suspended = serving.customer(FIXTURE.suspended)!;
+  test("suspended customers escalate even for reads", async () => {
+    const suspended = (await serving.customer(FIXTURE.suspended))!;
     expect(decide(base({ intent: "check_balance", customer: suspended }))).toMatchObject({
       action: "escalate",
       ruleIds: ["POL_STATUS"],
@@ -63,18 +64,18 @@ describe("decide", () => {
 describe("decide boundaries and fail-closed inputs", () => {
   const one = (t: ReturnType<typeof txWith>) => decide(base({ targets: [t] }));
 
-  test("amount_usd exactly 250 confirms; 250.01 escalates", () => {
+  test("amount_usd exactly 250 confirms; 250.01 escalates", async () => {
     expect(one(txWith({ amount_usd: 250 }))).toMatchObject({ action: "confirm", ruleIds: ["POL_DSP_OK"] });
     expect(one(txWith({ amount_usd: 250.01 }))).toMatchObject({ action: "escalate", ruleIds: ["POL_DSP_AMOUNT"] });
   });
 
-  test("fraud_score exactly 30 escalates; 29.99 confirms; null escalates", () => {
+  test("fraud_score exactly 30 escalates; 29.99 confirms; null escalates", async () => {
     expect(one(txWith({ fraud_score: 30 }))).toMatchObject({ action: "escalate", ruleIds: ["POL_DSP_FRAUD"] });
     expect(one(txWith({ fraud_score: 29.99 }))).toMatchObject({ action: "confirm", ruleIds: ["POL_DSP_OK"] });
     expect(one(txWith({ fraud_score: null }))).toMatchObject({ action: "escalate", ruleIds: ["POL_DSP_FRAUD"] });
   });
 
-  test("any non-Active customer status escalates", () => {
+  test("any non-Active customer status escalates", async () => {
     for (const status of ["Inactive", "Closed", "Suspended", "", "active"]) {
       expect(decide(base({ intent: "check_balance", customer: { ...customer, customer_status: status } }))).toMatchObject({
         action: "escalate",
@@ -83,13 +84,13 @@ describe("decide boundaries and fail-closed inputs", () => {
     }
   });
 
-  test("unparseable, future-dated and too-old transactions escalate on age", () => {
+  test("unparseable, future-dated and too-old transactions escalate on age", async () => {
     expect(one(txWith({ transaction_date: "not a date" }))).toMatchObject({ ruleIds: ["POL_DSP_AGE"] });
     expect(one(txWith({ transaction_date: "2026-07-01T12:00:00" }))).toMatchObject({ ruleIds: ["POL_DSP_AGE"] });
     expect(one(txWith({ transaction_date: "2026-06-17T23:00:00" }))).toMatchObject({ action: "confirm" });
   });
 
-  test("only Purchase, Withdrawal and Adjustment are auto-disputable", () => {
+  test("only Purchase, Withdrawal and Adjustment are auto-disputable", async () => {
     for (const type of ["Purchase", "Withdrawal", "Adjustment"]) {
       expect(one(txWith({ transaction_type: type }))).toMatchObject({ action: "confirm" });
     }
@@ -98,19 +99,19 @@ describe("decide boundaries and fail-closed inputs", () => {
     }
   });
 
-  test("duplicate targets are counted once", () => {
+  test("duplicate targets are counted once", async () => {
     const d = decide(base({ targets: [tx(FIXTURE.txSmall), tx(FIXTURE.txSmall), tx(FIXTURE.txSmall)] }));
     expect(d).toMatchObject({ action: "confirm", ruleIds: ["POL_DSP_OK"] });
   });
 
-  test("NaN risk escalates", () => {
+  test("NaN risk escalates", async () => {
     expect(decide(base({ intent: "check_balance", riskScore: Number.NaN }))).toMatchObject({
       action: "escalate",
       ruleIds: ["POL_RISK"],
     });
   });
 
-  test("targets not sourced from the database escalate with PROV_001", () => {
+  test("targets not sourced from the database escalate with PROV_001", async () => {
     for (const src of ["llm", "user", "jwt"] as const) {
       expect(decide(base({ targets: [txWith({}, src)] }))).toMatchObject({ action: "escalate", ruleIds: ["PROV_001"] });
     }
@@ -120,8 +121,8 @@ describe("decide boundaries and fail-closed inputs", () => {
     });
   });
 
-  test("cross-tier: gate tier short-circuits dispute checks", () => {
-    const suspended = serving.customer(FIXTURE.suspended)!;
+  test("cross-tier: gate tier short-circuits dispute checks", async () => {
+    const suspended = (await serving.customer(FIXTURE.suspended))!;
     expect(decide(base({ customer: suspended, targets: [tx(FIXTURE.txLarge)] }))).toEqual({
       action: "escalate",
       ruleIds: ["POL_STATUS"],

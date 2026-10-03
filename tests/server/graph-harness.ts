@@ -1,10 +1,9 @@
-import { Database } from "bun:sqlite";
 import { verifyAuditChain } from "../../server/audit";
 import { createAuth, type Language } from "../../server/auth";
 import { openServing } from "../../server/db/serving";
 import { CircuitBreaker } from "../../server/gates/budget";
 import { buildGraph, type ConversationGraph } from "../../server/graph/build";
-import { BunSqliteSaver } from "../../server/graph/checkpointer";
+import { SqlCheckpointSaver } from "../../server/graph/checkpointer";
 import type { GraphDeps } from "../../server/graph/deps";
 import { POLICY } from "../../server/policy/config";
 import { type TurnDeps, type TurnEvent, canaryFor, resumeTurn, runTurn } from "../../server/graph/turn";
@@ -12,7 +11,7 @@ import type { Llm } from "../../server/llm/types";
 import { createKeywordRouter } from "../../server/router/keyword";
 import { Tracer } from "../../server/trace";
 import { createTools, type Tools } from "../../server/tools";
-import { makeOps, makeServing } from "./fixtures";
+import { makeDb } from "./fixtures";
 import { type Script, fakeLlm } from "./llm-fake";
 
 export const AUTH_CFG = {
@@ -40,7 +39,7 @@ export interface HarnessOptions {
   persona?: string;
   language?: Language;
   safeMode?: boolean;
-  /** Extra serving-db rows (e.g. another auto-dispute-eligible transaction) for tests that need more than the base fixture. */
+  /** Extra serving rows (e.g. another auto-dispute-eligible transaction) for tests that need more than the base fixture. */
   seedServingSql?: string;
   /** Wraps the real tools, for tests that need one tool call to fail in a controlled way. */
   tools?: (real: Tools) => Tools;
@@ -48,14 +47,8 @@ export interface HarnessOptions {
 
 /** A logged-in customer with real tools, policy, router, checkpointer and audit; only the model is scripted. */
 export async function harness(o: HarnessOptions = {}) {
-  const ops = makeOps();
-  const servingPath = makeServing();
-  if (o.seedServingSql) {
-    const seed = new Database(servingPath);
-    seed.exec(o.seedServingSql);
-    seed.close();
-  }
-  const serving = openServing(servingPath);
+  const ops = await makeDb(o.seedServingSql);
+  const serving = openServing(ops);
   const auth = createAuth(AUTH_CFG, serving, ops);
   const { token, session } = await auth.login(o.persona ?? "normal", "2468", o.language ?? "es");
   const llm = o.llm === undefined ? fakeLlm(o.script ?? (() => "{}")) : o.llm;
@@ -69,7 +62,7 @@ export async function harness(o: HarnessOptions = {}) {
     router: createKeywordRouter(),
     llm,
     breaker: new CircuitBreaker({ failureThreshold: 3, cooldownMs: 60_000 }),
-    checkpointer: new BunSqliteSaver(ops),
+    checkpointer: new SqlCheckpointSaver(ops),
   };
   const current = () => auth.verify(token, ["active", "handed_off"]);
   /** Bypasses runTurn/resumeTurn's gates and streams a raw Command straight into the compiled graph, on the same
@@ -105,12 +98,12 @@ export async function harness(o: HarnessOptions = {}) {
     resume: async (interruptId: string, nonce: string, approved: boolean) =>
       collect(resumeTurn(deps, await current(), { interruptId, nonce, approved })),
     driveRaw,
-    status: () =>
-      ops.query<{ status: string }, [string]>("select status from sessions where session_id = ?").get(session.sessionId)?.status,
-    risk: () =>
-      ops.query<{ r: number }, [string]>("select risk_score as r from sessions where session_id = ?").get(session.sessionId)?.r,
-    disputes: () => ops.query<{ dispute_id: string; transaction_ids: string }, []>("select dispute_id, transaction_ids from disputes").all(),
-    handoffs: () => ops.query<{ handoff_id: string; rule_ids: string; card: string }, []>("select handoff_id, rule_ids, card from handoffs").all(),
-    auditOk: () => verifyAuditChain(ops).ok,
+    status: async () =>
+      (await ops.one<{ status: string }>("select status from ops.sessions where session_id = $1", [session.sessionId]))?.status,
+    risk: async () =>
+      (await ops.one<{ r: number }>("select risk_score as r from ops.sessions where session_id = $1", [session.sessionId]))?.r,
+    disputes: () => ops.all<{ dispute_id: string; transaction_ids: string }>("select dispute_id, transaction_ids from ops.disputes"),
+    handoffs: () => ops.all<{ handoff_id: string; rule_ids: string; card: string }>("select handoff_id, rule_ids, card from ops.handoffs"),
+    auditOk: async () => (await verifyAuditChain(ops)).ok,
   };
 }

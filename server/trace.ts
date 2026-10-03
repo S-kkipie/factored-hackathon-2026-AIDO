@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Sql } from "./db/sql";
 import { sha256Hex } from "./hash";
 
 export type AttrValue = string | number | boolean | null | string[];
@@ -15,11 +15,11 @@ export interface SpanRecord {
   attributes: Attributes;
 }
 
-/** The conversation id exported in spans is a hash: raw session ids never leave ops.sqlite. */
+/** The conversation id exported in spans is a hash: raw session ids never leave the ops schema. */
 export const conversationId = (sessionId: string): string => sha256Hex(`conv:${sessionId}`).slice(0, 32);
 
 /**
- * Records spans with OpenTelemetry GenAI attribute names into ops.sqlite (source for the trace view).
+ * Records spans with OpenTelemetry GenAI attribute names into `ops.spans` (source for the trace view).
  * Export to Langfuse over OTLP is plan 6; span names and attributes already follow the conventions.
  * Content is never recorded: only ids, counts, rule ids and decisions.
  */
@@ -27,20 +27,24 @@ export class Tracer {
   readonly traceId: string;
 
   constructor(
-    private readonly ops: Database,
+    private readonly ops: Sql,
     readonly sessionId: string,
     traceId?: string,
   ) {
     this.traceId = traceId ?? crypto.randomUUID().replaceAll("-", "");
   }
 
-  record(name: string, attributes: Attributes, startedAt: Date, durationMs: number, parentId: string | null = null): string {
+  async record(
+    name: string,
+    attributes: Attributes,
+    startedAt: Date,
+    durationMs: number,
+    parentId: string | null = null,
+  ): Promise<string> {
     const spanId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
-    this.ops
-      .query(
-        "insert into spans (span_id, trace_id, session_id, parent_id, name, started_at, duration_ms, attributes) values (?, ?, ?, ?, ?, ?, ?, ?)",
-      )
-      .run(
+    await this.ops.run(
+      "insert into ops.spans (span_id, trace_id, session_id, parent_id, name, started_at, duration_ms, attributes) values ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [
         spanId,
         this.traceId,
         this.sessionId,
@@ -49,7 +53,8 @@ export class Tracer {
         startedAt.toISOString(),
         durationMs,
         JSON.stringify({ "gen_ai.conversation.id": conversationId(this.sessionId), ...attributes }),
-      );
+      ],
+    );
     return spanId;
   }
 
@@ -66,16 +71,15 @@ export class Tracer {
       attrs["error.type"] = e instanceof Error ? e.name : "unknown";
       throw e;
     } finally {
-      this.record(name, attrs, started, performance.now() - t0);
+      await this.record(name, attrs, started, performance.now() - t0);
     }
   }
 }
 
-export function listSpans(ops: Database, sessionId: string): SpanRecord[] {
-  return ops
-    .query<Omit<SpanRecord, "attributes"> & { attributes: string }, [string]>(
-      "select * from spans where session_id = ? order by started_at, rowid",
-    )
-    .all(sessionId)
-    .map((r) => ({ ...r, attributes: JSON.parse(r.attributes) as Attributes }));
+export async function listSpans(ops: Sql, sessionId: string): Promise<SpanRecord[]> {
+  const rows = await ops.all<Omit<SpanRecord, "attributes"> & { attributes: string }>(
+    "select span_id, trace_id, session_id, parent_id, name, started_at, duration_ms, attributes from ops.spans where session_id = $1 order by started_at, ord",
+    [sessionId],
+  );
+  return rows.map((r) => ({ ...r, attributes: JSON.parse(r.attributes) as Attributes }));
 }

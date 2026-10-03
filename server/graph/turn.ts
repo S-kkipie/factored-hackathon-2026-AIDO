@@ -1,10 +1,10 @@
-import type { Database } from "bun:sqlite";
 import { Command } from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { appendAudit } from "../audit";
 import type { Auth, Session, SessionStatus } from "../auth";
 import type { ServerConfig } from "../config";
 import type { ServingDb } from "../db/serving";
+import type { Sql } from "../db/sql";
 import { CallCounter, type CircuitBreaker, checkBudget, recordTurn } from "../gates/budget";
 import { injectionSignal } from "../gates/injection";
 import { inputGate } from "../gates/input";
@@ -26,7 +26,7 @@ import { type ConfirmInterrupt, type Confirmation, type Outcome, type TurnValues
 export interface TurnDeps {
   cfg: Pick<ServerConfig, "safeMode" | "modelTimeoutMs" | "canarySecret">;
   serving: ServingDb;
-  ops: Database;
+  ops: Sql;
   tools: Tools;
   auth: Pick<Auth, "setStatus">;
   router: Router;
@@ -118,8 +118,8 @@ export async function* drive(
 
   const values = (await app.getState(cfg)).values as TurnValues;
   if (pending) {
-    const nonce = issueNonce(deps.ops, { sessionId, interruptId: pending.id, payload: pending.value.payload }, nowMs, NONCE_TTL_MS);
-    appendAudit(deps.ops, { sessionId, kind: "confirm_requested", payload: { interruptId: pending.id, ...pending.value.payload } });
+    const nonce = await issueNonce(deps.ops, { sessionId, interruptId: pending.id, payload: pending.value.payload }, nowMs, NONCE_TTL_MS);
+    await appendAudit(deps.ops, { sessionId, kind: "confirm_requested", payload: { interruptId: pending.id, ...pending.value.payload } });
     yield {
       type: "interrupt",
       interruptId: pending.id,
@@ -142,9 +142,9 @@ export async function* drive(
  * payload — `TL_IDEMPOTENCY_MISMATCH`, caught below, with nothing actually queued. Returns whether the handoff
  * was actually created, so the caller can report `handoff` vs. `handoff_failed`.
  */
-function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId, turn: number): boolean {
+async function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId, turn: number): Promise<boolean> {
   try {
-    deps.tools.createHandoff({
+    await deps.tools.createHandoff({
       sessionId: session.sessionId,
       customerId: customerOf(session),
       ruleIds: [ruleId],
@@ -158,17 +158,17 @@ function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId
       },
       idempotencyKey: `${session.sessionId}:budget-${ruleId}-${turn}`,
     });
-    deps.auth.setStatus(session.sessionId, "handed_off");
+    await deps.auth.setStatus(session.sessionId, "handed_off");
     return true;
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
-    appendAudit(deps.ops, { sessionId: session.sessionId, kind: "handoff", ruleId: e.ruleId, payload: {} });
+    await appendAudit(deps.ops, { sessionId: session.sessionId, kind: "handoff", ruleId: e.ruleId, payload: {} });
     return false;
   }
 }
 
-const turnsOf = (ops: Database, sessionId: string) =>
-  ops.query<{ turns: number }, [string]>("select turns from sessions where session_id = ?").get(sessionId)?.turns ?? 0;
+const turnsOf = async (ops: Sql, sessionId: string) =>
+  (await ops.one<{ turns: number }>("select turns from ops.sessions where session_id = $1", [sessionId]))?.turns ?? 0;
 
 /**
  * In-process per-session mutex (fix round 1). `runTurn` and `resumeTurn` each run their entire body — including
@@ -213,40 +213,42 @@ async function* runTurnLocked(deps: TurnDeps, session: CustomerSession, text: st
   const lang = session.language;
 
   if (session.status === "handed_off") {
-    const gate = inputGate(deps.ops, sid, text, now.getTime());
+    const gate = await inputGate(deps.ops, sid, text, now.getTime());
     if (!gate.ok) {
-      appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", ruleId: gate.ruleId, payload: {} });
+      await appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", ruleId: gate.ruleId, payload: {} });
       yield { type: "message", text: render("blocked_input", lang) };
       yield { type: "done", outcome: "blocked", ruleIds: [gate.ruleId] };
       return;
     }
-    deps.ops
-      .query("insert into messages (session_id, author, text, at) values (?, 'customer', ?, ?)")
-      .run(sid, gate.text, now.toISOString());
+    await deps.ops.run("insert into ops.messages (session_id, author, text, at) values ($1, 'customer', $2, $3)", [
+      sid,
+      gate.text,
+      now.toISOString(),
+    ]);
     yield { type: "message", text: render("handed_off", lang) };
     yield { type: "done", outcome: "handed_off", ruleIds: [] };
     return;
   }
 
-  const budget = checkBudget(deps.ops, sid, now.toISOString().slice(0, 10));
+  const budget = await checkBudget(deps.ops, sid, now.toISOString().slice(0, 10));
   if (!budget.ok) {
-    appendAudit(deps.ops, { sessionId: sid, kind: "budget", ruleId: budget.ruleId, payload: {} });
-    const escalated = escalateDirect(deps, session, budget.ruleId, turnsOf(deps.ops, sid));
+    await appendAudit(deps.ops, { sessionId: sid, kind: "budget", ruleId: budget.ruleId, payload: {} });
+    const escalated = await escalateDirect(deps, session, budget.ruleId, await turnsOf(deps.ops, sid));
     yield { type: "message", text: render(escalated ? "budget_exhausted" : "handoff_failed", lang) };
     yield { type: "done", outcome: escalated ? "handoff" : "handoff_failed", ruleIds: [budget.ruleId] };
     return;
   }
 
-  const gate = inputGate(deps.ops, sid, text, now.getTime());
+  const gate = await inputGate(deps.ops, sid, text, now.getTime());
   if (!gate.ok) {
-    appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", ruleId: gate.ruleId, payload: {} });
+    await appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", ruleId: gate.ruleId, payload: {} });
     yield { type: "message", text: render("blocked_input", lang) };
     yield { type: "done", outcome: "blocked", ruleIds: [gate.ruleId] };
     return;
   }
-  recordTurn(deps.ops, sid);
-  const turn = turnsOf(deps.ops, sid);
-  appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", payload: { turn, pii: gate.piiFound } });
+  await recordTurn(deps.ops, sid);
+  const turn = await turnsOf(deps.ops, sid);
+  await appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", payload: { turn, pii: gate.piiFound } });
 
   const { app } = graphFor(deps, session, turn, now);
   yield* drive(deps, app, sid, freshTurn(gate.text, lang, injectionSignal(gate.text)), now.getTime());
@@ -270,12 +272,12 @@ async function* resumeTurnLocked(deps: TurnDeps, session: CustomerSession, r: Re
   customerOf(session);
   const now = (deps.now ?? (() => new Date()))();
   const sid = session.sessionId;
-  const { app } = graphFor(deps, session, turnsOf(deps.ops, sid), now);
+  const { app } = graphFor(deps, session, await turnsOf(deps.ops, sid), now);
   const state = await app.getState(threadOf(sid));
   const pending = state.tasks.flatMap((t) => t.interrupts).find((i) => i.id === r.interruptId);
 
-  const invalid = function* (ruleId: RuleId): Generator<TurnEvent> {
-    appendAudit(deps.ops, { sessionId: sid, kind: "confirm_rejected", ruleId, payload: { interruptId: r.interruptId } });
+  const invalid = async function* (ruleId: RuleId): AsyncGenerator<TurnEvent> {
+    await appendAudit(deps.ops, { sessionId: sid, kind: "confirm_rejected", ruleId, payload: { interruptId: r.interruptId } });
     yield { type: "message", text: render("confirmation_invalid", session.language) };
     yield { type: "done", outcome: "confirmation_invalid", ruleIds: [ruleId] };
   };
@@ -283,9 +285,9 @@ async function* resumeTurnLocked(deps: TurnDeps, session: CustomerSession, r: Re
   if (session.status !== "active") return yield* invalid("IN_SESSION_REVOKED");
   if (!pending) return yield* invalid("TL_NONCE_MISMATCH");
   const payload = (pending.value as ConfirmInterrupt).payload;
-  const nonce = consumeNonce(deps.ops, { sessionId: sid, interruptId: r.interruptId, payload, nonce: r.nonce }, now.getTime());
+  const nonce = await consumeNonce(deps.ops, { sessionId: sid, interruptId: r.interruptId, payload, nonce: r.nonce }, now.getTime());
   if (!nonce.ok) return yield* invalid(nonce.ruleId);
-  appendAudit(deps.ops, { sessionId: sid, kind: "confirm_answered", payload: { interruptId: r.interruptId, approved: r.approved } });
+  await appendAudit(deps.ops, { sessionId: sid, kind: "confirm_answered", payload: { interruptId: r.interruptId, approved: r.approved } });
 
   const payloadHash = sha256Hex(canonicalJson(payload));
   const answer: Confirmation = { approved: r.approved, interruptId: r.interruptId, payloadHash };

@@ -1,6 +1,6 @@
-import type { Database } from "bun:sqlite";
 import { appendAudit } from "./audit";
 import type { Auth } from "./auth";
+import type { Sql } from "./db/sql";
 import { maskPii } from "./gates/pii";
 import { type HandoffCard, sanitizeNote } from "./tools";
 
@@ -32,55 +32,58 @@ interface HandoffRow {
   card: string;
 }
 
-export function listQueue(ops: Database): QueueItem[] {
-  return ops
-    .query<HandoffRow, []>(
-      "select handoff_id, session_id, status, created_at, taken_by, rule_ids, card from handoffs where status in ('queued', 'taken') order by created_at",
-    )
-    .all()
-    .map((r) => ({
-      handoffId: r.handoff_id,
-      sessionId: r.session_id,
-      status: r.status,
-      createdAt: r.created_at,
-      takenBy: r.taken_by,
-      ruleIds: JSON.parse(r.rule_ids) as string[],
-      card: JSON.parse(r.card) as HandoffCard,
-    }));
+export async function listQueue(ops: Sql): Promise<QueueItem[]> {
+  const rows = await ops.all<HandoffRow>(
+    "select handoff_id, session_id, status, created_at, taken_by, rule_ids, card from ops.handoffs where status in ('queued', 'taken') order by created_at, handoff_id",
+  );
+  return rows.map((r) => ({
+    handoffId: r.handoff_id,
+    sessionId: r.session_id,
+    status: r.status,
+    createdAt: r.created_at,
+    takenBy: r.taken_by,
+    ruleIds: JSON.parse(r.rule_ids) as string[],
+    card: JSON.parse(r.card) as HandoffCard,
+  }));
 }
 
-const openHandoff = (ops: Database, sessionId: string) =>
-  ops
-    .query<{ handoff_id: string; status: string }, [string]>(
-      "select handoff_id, status from handoffs where session_id = ? and status in ('queued', 'taken') order by created_at desc limit 1",
-    )
-    .get(sessionId);
+const openHandoff = (ops: Sql, sessionId: string) =>
+  ops.one<{ handoff_id: string; status: string }>(
+    "select handoff_id, status from ops.handoffs where session_id = $1 and status in ('queued', 'taken') order by created_at desc limit 1",
+    [sessionId],
+  );
 
 /** Claims the session's open handoff for this agent. False when there is none or another agent holds it. */
-export function takeSession(ops: Database, sessionId: string, agentSessionId: string): boolean {
-  const h = openHandoff(ops, sessionId);
+export async function takeSession(ops: Sql, sessionId: string, agentSessionId: string): Promise<boolean> {
+  const h = await openHandoff(ops, sessionId);
   if (!h) return false;
-  const changed = ops
-    .query("update handoffs set status = 'taken', taken_by = ? where handoff_id = ? and (taken_by is null or taken_by = ?)")
-    .run(agentSessionId, h.handoff_id, agentSessionId).changes;
-  if (changed === 1) appendAudit(ops, { sessionId, kind: "agent_take", payload: { handoffId: h.handoff_id } });
+  const changed = await ops.run(
+    "update ops.handoffs set status = 'taken', taken_by = $1 where handoff_id = $2 and status in ('queued', 'taken') and (taken_by is null or taken_by = $1)",
+    [agentSessionId, h.handoff_id],
+  );
+  if (changed === 1) await appendAudit(ops, { sessionId, kind: "agent_take", payload: { handoffId: h.handoff_id } });
   return changed === 1;
 }
 
-const heldBy = (ops: Database, sessionId: string, agentSessionId: string) =>
-  ops
-    .query<{ n: number }, [string, string]>(
-      "select count(*) as n from handoffs where session_id = ? and status = 'taken' and taken_by = ?",
+const heldBy = async (ops: Sql, sessionId: string, agentSessionId: string) =>
+  (
+    await ops.one<{ n: number }>(
+      "select count(*)::int as n from ops.handoffs where session_id = $1 and status = 'taken' and taken_by = $2",
+      [sessionId, agentSessionId],
     )
-    .get(sessionId, agentSessionId)?.n === 1;
+  )?.n === 1;
 
 /** A human reply to the customer. Only the agent holding the handoff may reply. */
-export function agentReply(ops: Database, sessionId: string, agentSessionId: string, text: string, now = new Date()): boolean {
-  if (!heldBy(ops, sessionId, agentSessionId)) return false;
+export async function agentReply(ops: Sql, sessionId: string, agentSessionId: string, text: string, now = new Date()): Promise<boolean> {
+  if (!(await heldBy(ops, sessionId, agentSessionId))) return false;
   const clean = sanitizeNote(text);
   if (clean.length === 0) return false;
-  ops.query("insert into messages (session_id, author, text, at) values (?, 'agent', ?, ?)").run(sessionId, clean, now.toISOString());
-  appendAudit(ops, { sessionId, kind: "agent_reply", payload: { chars: clean.length } });
+  await ops.run("insert into ops.messages (session_id, author, text, at) values ($1, 'agent', $2, $3)", [
+    sessionId,
+    clean,
+    now.toISOString(),
+  ]);
+  await appendAudit(ops, { sessionId, kind: "agent_reply", payload: { chars: clean.length } });
   return true;
 }
 
@@ -89,22 +92,28 @@ export function agentReply(ops: Database, sessionId: string, agentSessionId: str
  * it is still `handed_off`. If the customer logged out (or otherwise left `handed_off`) while the agent held the
  * case, resuming must not revive a revoked token into `active`.
  */
-export function resolveSession(ops: Database, auth: Pick<Auth, "setStatus">, sessionId: string, agentSessionId: string, now = new Date()): boolean {
-  if (!heldBy(ops, sessionId, agentSessionId)) return false;
-  ops
-    .query("update handoffs set status = 'resolved', resolved_at = ? where session_id = ? and status = 'taken'")
-    .run(now.toISOString(), sessionId);
-  const status = ops.query<{ status: string }, [string]>("select status from sessions where session_id = ?").get(sessionId)?.status;
-  if (status === "handed_off") auth.setStatus(sessionId, "active");
-  appendAudit(ops, { sessionId, kind: "agent_resolve", payload: {} });
+export async function resolveSession(
+  ops: Sql,
+  auth: Pick<Auth, "setStatus">,
+  sessionId: string,
+  agentSessionId: string,
+  now = new Date(),
+): Promise<boolean> {
+  if (!(await heldBy(ops, sessionId, agentSessionId))) return false;
+  await ops.run(
+    "update ops.handoffs set status = 'resolved', resolved_at = $1 where session_id = $2 and status = 'taken' and taken_by = $3",
+    [now.toISOString(), sessionId, agentSessionId],
+  );
+  const status = (await ops.one<{ status: string }>("select status from ops.sessions where session_id = $1", [sessionId]))?.status;
+  if (status === "handed_off") await auth.setStatus(sessionId, "active");
+  await appendAudit(ops, { sessionId, kind: "agent_resolve", payload: {} });
   return true;
 }
 
-export function sessionMessages(ops: Database, sessionId: string, afterId = 0): ChatMessage[] {
-  return ops
-    .query<ChatMessage, [string, number]>(
-      "select id, author, text, at from messages where session_id = ? and id > ? order by id limit 200",
-    )
-    .all(sessionId, afterId)
-    .map((m) => ({ ...m, text: m.author === "customer" ? maskPii(m.text).text : m.text }));
+export async function sessionMessages(ops: Sql, sessionId: string, afterId = 0): Promise<ChatMessage[]> {
+  const rows = await ops.all<ChatMessage>(
+    "select id, author, text, at from ops.messages where session_id = $1 and id > $2 order by id limit 200",
+    [sessionId, afterId],
+  );
+  return rows.map((m) => ({ ...m, text: m.author === "customer" ? maskPii(m.text).text : m.text }));
 }

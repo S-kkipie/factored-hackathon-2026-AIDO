@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { inputGate } from "../../server/gates/input";
 import { cpfValid, luhnValid, maskPii } from "../../server/gates/pii";
-import { makeOps } from "./fixtures";
+import { makeDb } from "./fixtures";
 
 describe("maskPii", () => {
   test("masks valid card numbers only", () => {
@@ -55,20 +55,20 @@ describe("maskPii", () => {
 
 describe("inputGate", () => {
   const t0 = 1_000_000;
-  test("rejects empty and oversized input", () => {
-    const ops = makeOps();
-    expect(inputGate(ops, "s1", "   ", t0)).toEqual({ ok: false, ruleId: "IN_EMPTY" });
-    expect(inputGate(ops, "s1", "a".repeat(1001), t0)).toEqual({ ok: false, ruleId: "IN_SIZE" });
+  test("rejects empty and oversized input", async () => {
+    const ops = await makeDb();
+    expect(await inputGate(ops, "s1", "   ", t0)).toEqual({ ok: false, ruleId: "IN_EMPTY" });
+    expect(await inputGate(ops, "s1", "a".repeat(1001), t0)).toEqual({ ok: false, ruleId: "IN_SIZE" });
   });
-  test("rate limits per session within a sliding minute", () => {
-    const ops = makeOps();
-    for (let i = 0; i < 12; i++) expect(inputGate(ops, "s1", "hola", t0 + i).ok).toBe(true);
-    expect(inputGate(ops, "s1", "hola", t0 + 20)).toEqual({ ok: false, ruleId: "IN_RATE" });
-    expect(inputGate(ops, "s2", "hola", t0 + 20).ok).toBe(true);
-    expect(inputGate(ops, "s1", "hola", t0 + 61_000).ok).toBe(true);
+  test("rate limits per session within a sliding minute", async () => {
+    const ops = await makeDb();
+    for (let i = 0; i < 12; i++) expect((await inputGate(ops, "s1", "hola", t0 + i)).ok).toBe(true);
+    expect(await inputGate(ops, "s1", "hola", t0 + 20)).toEqual({ ok: false, ruleId: "IN_RATE" });
+    expect((await inputGate(ops, "s2", "hola", t0 + 20)).ok).toBe(true);
+    expect((await inputGate(ops, "s1", "hola", t0 + 61_000)).ok).toBe(true);
   });
-  test("returns masked text and the kinds found", () => {
-    const r = inputGate(makeOps(), "s1", "mi correo es ana@mail.com", t0);
+  test("returns masked text and the kinds found", async () => {
+    const r = await inputGate(await makeDb(), "s1", "mi correo es ana@mail.com", t0);
     expect(r).toEqual({ ok: true, text: "mi correo es [EMAIL]", piiFound: ["email"] });
   });
 });

@@ -45,7 +45,7 @@ export function createApp(deps: AppDeps) {
       return json(500, { error: "internal" });
     })
     .get("/api/health", () => ({ ok: true }))
-    .get("/api/demo-users", () => deps.serving.demoUsers().map((u) => ({ persona: u.persona })))
+    .get("/api/demo-users", async () => (await deps.serving.demoUsers()).map((u) => ({ persona: u.persona })))
     .post(
       "/api/auth/login",
       async ({ body }) => {
@@ -81,7 +81,7 @@ export function createApp(deps: AppDeps) {
     .post("/api/auth/logout", async ({ request }) => {
       const r = await authed(request, ["active", "handed_off"]);
       if ("error" in r) return r.error;
-      deps.auth.revoke(r.session.sessionId);
+      await deps.auth.revoke(r.session.sessionId);
       return { ok: true };
     })
     .post("/api/agui/run", async ({ request }) => {
@@ -95,7 +95,7 @@ export function createApp(deps: AppDeps) {
       }
       const run = startRun(deps, r.session, body);
       if ("error" in run) {
-        appendAudit(deps.ops, { sessionId: r.session.sessionId, kind: "agui_rejected", ruleId: run.error.ruleId, payload: {} });
+        await appendAudit(deps.ops, { sessionId: r.session.sessionId, kind: "agui_rejected", ruleId: run.error.ruleId, payload: {} });
         return json(run.error.status, { ruleId: run.error.ruleId });
       }
       return sseResponse(toAgui(run.input, run.events), request.headers.get("accept") ?? undefined);
@@ -104,7 +104,7 @@ export function createApp(deps: AppDeps) {
       const r = await authed(request, ["active", "handed_off"]);
       if ("error" in r) return r.error;
       if (r.session.role !== "customer") return json(403, { ruleId: "IN_ROLE" });
-      return sessionMessages(deps.ops, r.session.sessionId, Number(query.after ?? 0) || 0).filter((m) => m.author === "agent");
+      return (await sessionMessages(deps.ops, r.session.sessionId, Number(query.after ?? 0) || 0)).filter((m) => m.author === "agent");
     })
     .get("/api/agent/queue", async ({ request }) => {
       const r = await asAgent(request);
@@ -119,21 +119,21 @@ export function createApp(deps: AppDeps) {
     .post("/api/agent/sessions/:id/take", async ({ request, params }) => {
       const r = await asAgent(request);
       if ("error" in r) return r.error;
-      return takeSession(deps.ops, params.id, r.session.sessionId) ? { ok: true } : json(409, { ok: false });
+      return (await takeSession(deps.ops, params.id, r.session.sessionId)) ? { ok: true } : json(409, { ok: false });
     })
     .post(
       "/api/agent/sessions/:id/reply",
       async ({ request, params, body }) => {
         const r = await asAgent(request);
         if ("error" in r) return r.error;
-        return agentReply(deps.ops, params.id, r.session.sessionId, body.text) ? { ok: true } : json(409, { ok: false });
+        return (await agentReply(deps.ops, params.id, r.session.sessionId, body.text)) ? { ok: true } : json(409, { ok: false });
       },
       { body: t.Object({ text: t.String({ minLength: 1, maxLength: 500 }) }) },
     )
     .post("/api/agent/sessions/:id/resume", async ({ request, params }) => {
       const r = await asAgent(request);
       if ("error" in r) return r.error;
-      return resolveSession(deps.ops, deps.auth, params.id, r.session.sessionId) ? { ok: true } : json(409, { ok: false });
+      return (await resolveSession(deps.ops, deps.auth, params.id, r.session.sessionId)) ? { ok: true } : json(409, { ok: false });
     })
     .get("/api/trace/:session", async ({ request, params }) => {
       const r = await authed(request, ["active", "handed_off"]);

@@ -1,7 +1,7 @@
-import type { Database } from "bun:sqlite";
 import { appendAudit } from "../audit";
 import type { Auth, Language } from "../auth";
 import type { ServingDb } from "../db/serving";
+import type { Sql } from "../db/sql";
 import type { ModelGateway } from "../llm/gateway";
 import type { Val } from "../provenance";
 import type { Router } from "../router/types";
@@ -17,7 +17,7 @@ export interface GraphDeps {
   /** Turn number after recordTurn; part of the handoff idempotency key. */
   turn: number;
   serving: ServingDb;
-  ops: Database;
+  ops: Sql;
   tools: Tools;
   auth: Pick<Auth, "setStatus">;
   router: Router;
@@ -29,8 +29,13 @@ export interface GraphDeps {
 }
 
 /** Nodes audit decisions only: rule ids, labels, ids and counts. Never raw text or PII (gates and tools write nothing). */
-export function audit(d: GraphDeps, kind: string, ruleIds: readonly RuleId[], payload: Record<string, unknown> = {}): void {
-  appendAudit(d.ops, {
+export async function audit(
+  d: GraphDeps,
+  kind: string,
+  ruleIds: readonly RuleId[],
+  payload: Record<string, unknown> = {},
+): Promise<void> {
+  await appendAudit(d.ops, {
     sessionId: d.sessionId,
     kind,
     ruleId: ruleIds.length > 0 ? [...ruleIds].sort().join(",") : undefined,

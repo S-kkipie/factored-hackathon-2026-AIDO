@@ -2,8 +2,9 @@ import { join } from "node:path";
 import { ROOT } from "../pipeline/config";
 
 export interface ServerConfig {
-  servingPath: string;
-  opsPath: string;
+  /** Postgres connection string (Supabase). Unset → local PGlite database in `pgliteDir`. */
+  databaseUrl: string | null;
+  pgliteDir: string;
   jwtSecret: Uint8Array;
   sessionTtlSeconds: number;
   demoPin: string;
@@ -20,6 +21,11 @@ export interface ServerConfig {
   port: number;
 }
 
+/** Database selection shared by the server and the data scripts: Supabase/Postgres when DATABASE_URL is set, else PGlite. */
+export function databaseOptions(env: Record<string, string | undefined> = process.env): Pick<ServerConfig, "databaseUrl" | "pgliteDir"> {
+  return { databaseUrl: env.DATABASE_URL || null, pgliteDir: env.PGLITE_DIR ?? join(ROOT, "data/pglite") };
+}
+
 /** Parses a required-positive-integer env var, falling back when unset; throws a clear message otherwise. */
 function positiveInt(name: string, raw: string | undefined, fallback: number): number {
   const n = raw === undefined ? fallback : Number(raw);
@@ -33,8 +39,7 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
   const secret = env.JWT_SECRET;
   if (!secret || secret.length < 32) throw new Error("JWT_SECRET must be set to at least 32 characters");
   return {
-    servingPath: env.SERVING_PATH ?? join(ROOT, "data/serving.sqlite"),
-    opsPath: env.OPS_PATH ?? join(ROOT, "data/ops.sqlite"),
+    ...databaseOptions(env),
     jwtSecret: new TextEncoder().encode(secret),
     sessionTtlSeconds: 15 * 60,
     demoPin: env.DEMO_PIN ?? "2468",

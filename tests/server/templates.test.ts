@@ -5,11 +5,11 @@ import { responseGate } from "../../server/gates/response";
 import { type TemplateId, render, renderFacts } from "../../server/policy/templates";
 import { val } from "../../server/provenance";
 import type { Dispute } from "../../server/tools";
-import { FIXTURE, makeServing } from "./fixtures";
+import { FIXTURE, makeDb } from "./fixtures";
 
-const serving = openServing(makeServing());
-const txs = serving.transactions(FIXTURE.normal);
-const products = serving.products(FIXTURE.normal);
+const serving = openServing(await makeDb());
+const txs = (await serving.transactions(FIXTURE.normal));
+const products = (await serving.products(FIXTURE.normal));
 const dispute: Dispute = {
   dispute_id: "D-ABCDEF123456",
   customer_id: FIXTURE.normal,
@@ -28,7 +28,7 @@ const IDS: TemplateId[] = [
 ];
 
 describe("templates", () => {
-  test.each(["es", "pt"] as const)("every %s template passes the response gate with its own facts", (lang) => {
+  test.each(["es", "pt"] as const)("every %s template passes the response gate with its own facts", async (lang) => {
     for (const id of IDS) {
       const text = render(id, lang, { transactions: txs.slice(0, 2), dispute, handoffId: "H-0123456789AB", reason: "incorrect_amount" });
       const facts = factsFrom(
@@ -40,12 +40,12 @@ describe("templates", () => {
     }
   });
 
-  test("dispute_created quotes the policy timeline and the case id", () => {
+  test("dispute_created quotes the policy timeline and the case id", async () => {
     expect(render("dispute_created", "es", { dispute })).toContain("D-ABCDEF123456");
     expect(render("dispute_created", "pt", { dispute })).toContain("10 dias úteis");
   });
 
-  test("confirm_dispute names the reason the confirmation nonce is bound to", () => {
+  test("confirm_dispute names the reason the confirmation nonce is bound to", async () => {
     expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "unrecognized" })).toContain("cargo no reconocido");
     expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "incorrect_amount" })).toContain("monto incorrecto");
     expect(render("confirm_dispute", "es", { transactions: txs.slice(0, 1), reason: "duplicate" })).toContain("cargo duplicado");
@@ -54,7 +54,7 @@ describe("templates", () => {
     expect(render("confirm_dispute", "pt", { transactions: txs.slice(0, 1), reason: "duplicate" })).toContain("cobrança duplicada");
   });
 
-  test("renderFacts output is grounded without templates", () => {
+  test("renderFacts output is grounded without templates", async () => {
     for (const lang of ["es", "pt"] as const) {
       const text = renderFacts(lang, { products, transactions: txs });
       const facts = factsFrom({ products: val(products, "db"), transactions: val(txs, "db") }, []);
@@ -64,7 +64,7 @@ describe("templates", () => {
 });
 
 describe("factsFrom", () => {
-  test("collects ids and amounts in fact currency and USD", () => {
+  test("collects ids and amounts in fact currency and USD", async () => {
     const f = factsFrom({ transactions: val(txs.slice(0, 1), "db"), products: val(products, "db") }, ["t"]);
     expect(f.ids).toContain(txs[0]!.transaction_id);
     expect(f.ids).toContain("PRD-A1");
@@ -73,7 +73,7 @@ describe("factsFrom", () => {
     expect(f.templates).toEqual(["t"]);
   });
 
-  test("rejects values that did not come from the database", () => {
+  test("rejects values that did not come from the database", async () => {
     expect(() => factsFrom({ transactions: val(txs, "llm") }, [])).toThrow("PROV_001");
     expect(() => factsFrom({ handoffId: val("H-1", "user") }, [])).toThrow("PROV_001");
   });

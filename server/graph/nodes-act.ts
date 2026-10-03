@@ -38,7 +38,7 @@ export const confirmNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
 export const afterConfirm = (s: TurnValues): string => (s.confirmation?.approved ? "create_dispute" : "cancelled");
 
 export const cancelledNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
-  audit(d, "confirm", [], { approved: false });
+  await audit(d, "confirm", [], { approved: false });
   return { reply: render("dispute_cancelled", d.language), outcome: "cancelled", ruleIds: s.ruleIds };
 };
 
@@ -55,7 +55,7 @@ export const createDisputeNode = (d: GraphDeps) => async (s: TurnValues): Promis
   const interruptId = s.confirmation?.interruptId;
   const expectedHash = sha256Hex(canonicalJson(confirmPayload(s)));
   if (!interruptId || s.confirmation?.payloadHash !== expectedHash) {
-    audit(d, "create_dispute", ["TL_NONCE_MISMATCH"]);
+    await audit(d, "create_dispute", ["TL_NONCE_MISMATCH"]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, "TL_NONCE_MISMATCH") };
   }
   const slots = s.slots?.v ?? {};
@@ -70,11 +70,11 @@ export const createDisputeNode = (d: GraphDeps) => async (s: TurnValues): Promis
         idempotencyKey: `${d.sessionId}:${interruptId}`,
       }),
     );
-    audit(d, "create_dispute", [], { disputeId: value.v.dispute_id, transactions: value.v.transaction_ids });
+    await audit(d, "create_dispute", [], { disputeId: value.v.dispute_id, transactions: value.v.transaction_ids });
     return { results: { ...s.results, dispute: value } };
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
-    audit(d, "create_dispute", [e.ruleId]);
+    await audit(d, "create_dispute", [e.ruleId]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, e.ruleId) };
   }
 };
@@ -84,17 +84,17 @@ export const afterCreate = (s: TurnValues): string => (s.forceHandoff ? "handoff
 /** Gate 6: read the case back by id; anything but an exact match hands off. */
 export const verifyNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
   const created = s.results.dispute?.v;
-  const back = created ? d.tools.getDispute(d.customerId, created.dispute_id) : null;
+  const back = created ? await d.tools.getDispute(d.customerId, created.dispute_id) : null;
   const same =
     created !== undefined &&
     back !== null &&
     back.v.status === "received" &&
     [...back.v.transaction_ids].sort().join() === [...created.transaction_ids].sort().join();
   if (!same || !back) {
-    audit(d, "verify", ["VF_READBACK"]);
+    await audit(d, "verify", ["VF_READBACK"]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, "VF_READBACK") };
   }
-  audit(d, "verify", [], { disputeId: back.v.dispute_id });
+  await audit(d, "verify", [], { disputeId: back.v.dispute_id });
   return {
     results: { ...s.results, dispute: back },
     reply: render("dispute_created", d.language, { dispute: back.v }),
@@ -130,8 +130,8 @@ export const handoffNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
         idempotencyKey: `${d.sessionId}:turn-${d.turn}`,
       }),
     );
-    d.auth.setStatus(d.sessionId, "handed_off");
-    audit(d, "handoff", ruleIds, { handoffId: value.v.handoffId });
+    await d.auth.setStatus(d.sessionId, "handed_off");
+    await audit(d, "handoff", ruleIds, { handoffId: value.v.handoffId });
     return {
       handoffId: value.v.handoffId,
       reply: render("handoff", d.language, { handoffId: value.v.handoffId }),
@@ -140,7 +140,7 @@ export const handoffNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
     };
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
-    audit(d, "handoff", [...ruleIds, e.ruleId]);
+    await audit(d, "handoff", [...ruleIds, e.ruleId]);
     return { reply: render("handoff_failed", d.language), outcome: "handoff_failed", ruleIds: addRules(ruleIds, e.ruleId) };
   }
 };

@@ -3,13 +3,13 @@ import { openServing } from "../../server/db/serving";
 import { ProvenanceError, val } from "../../server/provenance";
 import { createTools, sanitizeNote } from "../../server/tools";
 import { ToolError, runTool } from "../../server/tools/runtime";
-import { FIXTURE, makeOps, makeServing } from "./fixtures";
+import { FIXTURE, makeDb } from "./fixtures";
 
 const me = val(FIXTURE.normal, "jwt");
 
-function setup() {
-  const ops = makeOps();
-  return { ops, tools: createTools(openServing(makeServing()), ops) };
+async function setup() {
+  const ops = (await makeDb());
+  return { ops, tools: createTools(openServing(ops), ops) };
 }
 
 describe("runTool", () => {
@@ -46,22 +46,22 @@ describe("runTool", () => {
 });
 
 describe("tools", () => {
-  test("reads are scoped to the session customer and tagged db", () => {
-    const { tools } = setup();
-    expect(tools.getTransaction(me, val(FIXTURE.txSmall, "llm"))).toMatchObject({ src: "db", v: { amount_usd: 45 } });
-    expect(() => tools.getTransaction(me, val(FIXTURE.txOther, "user"))).toThrow(ToolError);
-    expect(tools.searchTransactions(me, { merchant: "uber" }).v.map((t) => t.transaction_id)).toEqual([FIXTURE.txFraud]);
+  test("reads are scoped to the session customer and tagged db", async () => {
+    const { tools } = await setup();
+    expect((await tools.getTransaction(me, val(FIXTURE.txSmall, "llm")))).toMatchObject({ src: "db", v: { amount_usd: 45 } });
+    await expect(tools.getTransaction(me, val(FIXTURE.txOther, "user"))).rejects.toThrow(ToolError);
+    expect((await tools.searchTransactions(me, { merchant: "uber" })).v.map((t) => t.transaction_id)).toEqual([FIXTURE.txFraud]);
   });
 
-  test("rejects identity values that did not come from the JWT", () => {
-    const { tools } = setup();
-    expect(() => tools.getAccounts(val(FIXTURE.normal, "llm"))).toThrow(ProvenanceError);
-    expect(() => tools.searchTransactions(val(FIXTURE.repeat, "user"), {})).toThrow("PROV_001");
+  test("rejects identity values that did not come from the JWT", async () => {
+    const { tools } = await setup();
+    await expect(tools.getAccounts(val(FIXTURE.normal, "llm"))).rejects.toThrow(ProvenanceError);
+    await expect(tools.searchTransactions(val(FIXTURE.repeat, "user"), {})).rejects.toThrow("PROV_001");
   });
 
-  test("createDispute requires db-sourced transactions owned by the customer and is idempotent", () => {
-    const { tools, ops } = setup();
-    const tx = tools.getTransaction(me, val(FIXTURE.txSmall, "user"));
+  test("createDispute requires db-sourced transactions owned by the customer and is idempotent", async () => {
+    const { tools, ops } = await setup();
+    const tx = (await tools.getTransaction(me, val(FIXTURE.txSmall, "user")));
     const input = {
       sessionId: "s1",
       customerId: me,
@@ -70,26 +70,27 @@ describe("tools", () => {
       customerNote: val("No reconozco <script>alert(1)</script> este cargo\u0007", "user" as const),
       idempotencyKey: "s1:int-1",
     };
-    const first = tools.createDispute(input);
-    const second = tools.createDispute(input);
+    const first = (await tools.createDispute(input));
+    const second = (await tools.createDispute(input));
     expect(first.v.dispute_id).toMatch(/^D-[0-9A-F]{12}$/);
     expect(second.v.dispute_id).toBe(first.v.dispute_id);
     expect(first.v).toMatchObject({ amount_usd: 45, status: "received", transaction_ids: [FIXTURE.txSmall] });
     expect(first.v.customer_note).toBe("No reconozco scriptalert(1)/script este cargo");
-    expect(ops.query<{ n: number }, []>("select count(*) as n from disputes").get()?.n).toBe(1);
-    expect(ops.query<{ u: number }, []>("select note_untrusted as u from disputes").get()?.u).toBe(1);
+    expect((await ops.one<{ n: number }>("select count(*)::int as n from ops.disputes"))?.n).toBe(1);
+    expect((await ops.one<{ u: number }>("select note_untrusted as u from ops.disputes"))?.u).toBe(1);
 
     const forged = { ...input, idempotencyKey: "s1:int-2", transactions: [val(tx.v, "llm" as const)] };
-    expect(() => tools.createDispute(forged)).toThrow("PROV_001");
+    await expect(tools.createDispute(forged)).rejects.toThrow("PROV_001");
   });
 
-  test("createDispute refuses transactions of another customer even if db-sourced", () => {
-    const { tools } = setup();
-    const other = createTools(openServing(makeServing()), makeOps()).getTransaction(
+  test("createDispute refuses transactions of another customer even if db-sourced", async () => {
+    const { tools } = await setup();
+    const otherDb = await makeDb();
+    const other = await createTools(openServing(otherDb), otherDb).getTransaction(
       val(FIXTURE.repeat, "jwt"),
       val(FIXTURE.txOther, "user"),
     );
-    expect(() =>
+    await expect(
       tools.createDispute({
         sessionId: "s1",
         customerId: me,
@@ -98,29 +99,29 @@ describe("tools", () => {
         customerNote: null,
         idempotencyKey: "k",
       }),
-    ).toThrow("TL_OWNER");
+    ).rejects.toThrow("TL_OWNER");
   });
 
-  test("getDispute is scoped and history includes created disputes", () => {
-    const { tools } = setup();
-    const tx = tools.getTransaction(me, val(FIXTURE.txSmall, "user"));
-    const d = tools.createDispute({
+  test("getDispute is scoped and history includes created disputes", async () => {
+    const { tools } = await setup();
+    const tx = (await tools.getTransaction(me, val(FIXTURE.txSmall, "user")));
+    const d = (await tools.createDispute({
       sessionId: "s1",
       customerId: me,
       transactions: [tx],
       reason: "duplicate",
       customerNote: null,
       idempotencyKey: "k1",
-    });
-    expect(tools.getDispute(me, d.v.dispute_id)?.v.dispute_id).toBe(d.v.dispute_id);
-    expect(tools.getDispute(val(FIXTURE.repeat, "jwt"), d.v.dispute_id)).toBeNull();
-    expect(tools.getDisputeHistory(me).v.disputedTransactionIds).toEqual([FIXTURE.txSmall]);
-    expect(tools.getDisputeHistory(val(FIXTURE.repeat, "jwt")).v.repeatComplainer).toBe(true);
+    }));
+    expect((await tools.getDispute(me, d.v.dispute_id))?.v.dispute_id).toBe(d.v.dispute_id);
+    expect((await tools.getDispute(val(FIXTURE.repeat, "jwt"), d.v.dispute_id))).toBeNull();
+    expect((await tools.getDisputeHistory(me)).v.disputedTransactionIds).toEqual([FIXTURE.txSmall]);
+    expect((await tools.getDisputeHistory(val(FIXTURE.repeat, "jwt"))).v.repeatComplainer).toBe(true);
   });
 
-  test("createHandoff stores a structured card", () => {
-    const { tools, ops } = setup();
-    const h = tools.createHandoff({
+  test("createHandoff stores a structured card", async () => {
+    const { tools, ops } = await setup();
+    const h = (await tools.createHandoff({
       sessionId: "s1",
       customerId: me,
       ruleIds: ["POL_DSP_AMOUNT"],
@@ -133,12 +134,12 @@ describe("tools", () => {
         openQuestions: ["¿Reconoce el comercio?"],
         language: "es",
       },
-    });
+    }));
     expect(h.v.handoffId).toMatch(/^H-/);
-    expect(ops.query<{ status: string }, []>("select status from handoffs").get()?.status).toBe("queued");
+    expect((await ops.one<{ status: string }>("select status from ops.handoffs"))?.status).toBe("queued");
   });
 
-  test("sanitizeNote strips control characters and markup, caps length", () => {
+  test("sanitizeNote strips control characters and markup, caps length", async () => {
     expect(sanitizeNote(" a\u0000b <b>c</b> `d` ")).toBe("a b bc/b d");
     expect(sanitizeNote("x".repeat(900)).length).toBe(500);
   });

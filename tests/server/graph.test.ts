@@ -49,7 +49,7 @@ describe("read intents", () => {
     const ev = await h.send("¿Cuál es mi saldo?");
     expect(doneOf(ev).ruleIds).toContain("RS_CANARY");
     expect(messageOf(ev)).not.toMatch(/cnry-/);
-    expect(h.risk()).toBe(1.5);
+    expect((await h.risk())).toBe(1.5);
   });
 
   test("list transactions filters by the extracted merchant", async () => {
@@ -65,7 +65,7 @@ describe("read intents", () => {
     const ev = await h.send("Quiero pedir un préstamo");
     expect(doneOf(ev).outcome).toBe("abstain");
     expect(doneOf(ev).ruleIds).toContain("RT_OUT_OF_SCOPE");
-    expect(h.risk()).toBe(0.5);
+    expect((await h.risk())).toBe(0.5);
   });
 
   test("unclear messages clarify", async () => {
@@ -85,18 +85,18 @@ describe("dispute flow", () => {
     expect(doneOf(ev).outcome).toBe("confirm");
     const it = interruptOf(ev)!;
     expect(it.text).toContain(FIXTURE.txSmall);
-    expect(h.disputes()).toEqual([]);
+    expect((await h.disputes())).toEqual([]);
 
     const done = await h.resume(it.interruptId, it.nonce, true);
     expect(doneOf(done).outcome).toBe("dispute_created");
-    const [d] = h.disputes();
+    const [d] = (await h.disputes());
     expect(JSON.parse(d!.transaction_ids)).toEqual([FIXTURE.txSmall]);
     expect(messageOf(done)).toContain(d!.dispute_id);
 
     const replay = await h.resume(it.interruptId, it.nonce, true);
     expect(doneOf(replay).outcome).toBe("confirmation_invalid");
-    expect(h.disputes().length).toBe(1);
-    expect(h.auditOk()).toBe(true);
+    expect((await h.disputes()).length).toBe(1);
+    expect((await h.auditOk())).toBe(true);
   });
 
   test("cancel creates nothing", async () => {
@@ -104,7 +104,7 @@ describe("dispute flow", () => {
     const it = interruptOf(await h.send("No reconozco un cargo de Super Ahorro"))!;
     const ev = await h.resume(it.interruptId, it.nonce, false);
     expect(doneOf(ev).outcome).toBe("cancelled");
-    expect(h.disputes()).toEqual([]);
+    expect((await h.disputes())).toEqual([]);
   });
 
   test("a wrong nonce is rejected without consuming the real one", async () => {
@@ -121,7 +121,7 @@ describe("dispute flow", () => {
     await h.send("Hola");
     const late = await h.resume(it.interruptId, it.nonce, true);
     expect(doneOf(late).ruleIds).toEqual(["TL_NONCE_MISMATCH"]);
-    expect(h.disputes()).toEqual([]);
+    expect((await h.disputes())).toEqual([]);
   });
 
   test("a large charge escalates to a handoff and later messages go to the agent", async () => {
@@ -129,20 +129,20 @@ describe("dispute flow", () => {
     const ev = await h.send("No reconozco el cargo de Boutique Moda");
     expect(doneOf(ev).outcome).toBe("handoff");
     expect(doneOf(ev).ruleIds).toContain("POL_DSP_AMOUNT");
-    const [ho] = h.handoffs();
+    const [ho] = (await h.handoffs());
     expect(messageOf(ev)).toContain(ho!.handoff_id);
     expect(JSON.parse(ho!.card).verifiedFacts[0].id).toBe(FIXTURE.txLarge);
-    expect(h.status()).toBe("handed_off");
+    expect((await h.status())).toBe("handed_off");
 
     const later = await h.send("¿Hay novedades? mi correo es ana@example.com");
     expect(doneOf(later).outcome).toBe("handed_off");
-    const stored = h.ops.query<{ text: string }, []>("select text from messages").get()!.text;
+    const stored = (await h.ops.one<{ text: string }>("select text from ops.messages"))!.text;
     expect(stored).toContain("[EMAIL]");
 
     // Even once handed off, the input gate still runs first: an empty message is blocked, not stored.
     const blocked = await h.send("   ");
     expect(doneOf(blocked).outcome).toBe("blocked");
-    expect(h.ops.query<{ n: number }, []>("select count(*) as n from messages").get()!.n).toBe(1);
+    expect((await h.ops.one<{ n: number }>("select count(*)::int as n from ops.messages"))!.n).toBe(1);
   });
 
   test("an id from another customer is never resolved", async () => {
@@ -150,7 +150,7 @@ describe("dispute flow", () => {
     const ev = await h.send(`No reconozco ${FIXTURE.txOther}`);
     expect(doneOf(ev).outcome).toBe("clarify");
     expect(messageOf(ev)).not.toContain(FIXTURE.txOther);
-    expect(h.disputes()).toEqual([]);
+    expect((await h.disputes())).toEqual([]);
   });
 
   test("ambiguous matches ask which transaction", async () => {
@@ -165,7 +165,7 @@ describe("dispute flow", () => {
 describe("confirmation integrity (fix round 1)", () => {
   const EXTRA_TX = "TRX-B1EXTRA000000000007";
   // A second auto-dispute-eligible transaction, distinct from FIXTURE.txSmall, seeded only for this describe block.
-  const SEED_SQL = `insert into transactions values ('${EXTRA_TX}', '2026-06-14T12:00:00', 'PRD-A1', '${FIXTURE.normal}',
+  const SEED_SQL = `insert into serving.transactions values ('${EXTRA_TX}', '2026-06-14T12:00:00', 'PRD-A1', '${FIXTURE.normal}',
     'Purchase', 'Health', 35, 'USD', 35, 'POS', 'Farmacia Norte', 'Health', 'México', 'CDMX', 'Approved', '00', 2, 't.csv', 'L1')`;
 
   test("a concurrent resume and a new dispute message cannot cross-apply a confirmation to the wrong transaction", async () => {
@@ -190,10 +190,10 @@ describe("confirmation integrity (fix round 1)", () => {
 
     // A's own dispute may or may not exist yet, depending on ordering — but every dispute that does exist must
     // be exactly A's confirmed transaction, never the other message's.
-    for (const d of h.disputes()) {
+    for (const d of (await h.disputes())) {
       expect(JSON.parse(d.transaction_ids)).toEqual([FIXTURE.txSmall]);
     }
-    expect(h.disputes().some((d) => JSON.parse(d.transaction_ids).includes(EXTRA_TX))).toBe(false);
+    expect((await h.disputes()).some((d) => JSON.parse(d.transaction_ids).includes(EXTRA_TX))).toBe(false);
   });
 
   test("a resume value whose payload hash does not match the checkpointed confirmation hands off and creates nothing", async () => {
@@ -209,10 +209,8 @@ describe("confirmation integrity (fix round 1)", () => {
       }),
     );
 
-    expect(h.disputes()).toEqual([]);
-    const lastCreateDispute = h.ops
-      .query<{ rule_id: string | null }, []>("select rule_id from audit_events where kind = 'create_dispute' order by seq desc limit 1")
-      .get();
+    expect((await h.disputes())).toEqual([]);
+    const lastCreateDispute = (await h.ops.one<{ rule_id: string | null }>("select rule_id from ops.audit_events where kind = 'create_dispute' order by seq desc limit 1"));
     expect(lastCreateDispute?.rule_id).toBe("TL_NONCE_MISMATCH");
   });
 });
@@ -263,42 +261,42 @@ describe("escalation and safety", () => {
     const h = await harness({ script: byPurpose({}, "Su saldo es 1200.50 USD.") });
     expect(doneOf(await h.send("   ")).outcome).toBe("blocked");
     await h.send("mi tarjeta 4111 1111 1111 1111, ¿cuál es mi saldo?");
-    const blobs = h.ops.query<{ c: Uint8Array | string }, []>("select checkpoint as c from checkpoints").all();
+    const blobs = (await h.ops.all<{ c: Uint8Array | string }>("select checkpoint as c from ops.checkpoints"));
     const text = blobs.map((b) => (typeof b.c === "string" ? b.c : new TextDecoder().decode(b.c))).join("");
     expect(text).toContain("[CARD]");
     expect(text).not.toContain("4111 1111");
-    const audit = h.ops.query<{ payload: string }, []>("select payload from audit_events").all().map((r) => r.payload).join("");
+    const audit = (await h.ops.all<{ payload: string }>("select payload from ops.audit_events")).map((r) => r.payload).join("");
     expect(audit).not.toContain("4111");
-    const spans = h.ops.query<{ attributes: string }, []>("select attributes from spans").all().map((r) => r.attributes).join("");
+    const spans = (await h.ops.all<{ attributes: string }>("select attributes from ops.spans")).map((r) => r.attributes).join("");
     expect(spans).not.toContain("4111");
   });
 
   test("exhausted turn budget escalates without running the graph", async () => {
     const h = await harness();
-    h.ops.query("update sessions set turns = 30").run();
+    (await h.ops.run("update ops.sessions set turns = 30"));
     const ev = await h.send("¿Cuál es mi saldo?");
     expect(doneOf(ev).ruleIds).toEqual(["BUD_TURNS"]);
-    expect(h.status()).toBe("handed_off");
-    expect(h.handoffs().length).toBe(1);
+    expect((await h.status())).toBe("handed_off");
+    expect((await h.handoffs()).length).toBe(1);
   });
 
   test("a budget escalation after an earlier handoff was resolved uses its own idempotency key", async () => {
     const h = await harness();
     const first = await h.send("Quiero hablar con un agente");
     expect(doneOf(first).outcome).toBe("handoff");
-    expect(h.handoffs().length).toBe(1);
-    expect(h.status()).toBe("handed_off");
+    expect((await h.handoffs()).length).toBe(1);
+    expect((await h.status())).toBe("handed_off");
 
     // Simulate the agent console resolving the handoff (same effect as agent.ts's takeSession + resolveSession).
-    h.ops.query("update handoffs set status = 'resolved' where session_id = ?").run(h.sessionId);
-    h.ops.query("update sessions set status = 'active' where session_id = ?").run(h.sessionId);
+    (await h.ops.run("update ops.handoffs set status = 'resolved' where session_id = $1", [h.sessionId]));
+    (await h.ops.run("update ops.sessions set status = 'active' where session_id = $1", [h.sessionId]));
 
-    h.ops.query("update sessions set tokens = 40000").run();
+    (await h.ops.run("update ops.sessions set tokens = 40000"));
     const second = await h.send("hola");
     expect(doneOf(second).ruleIds).toContain("BUD_TOKENS");
     expect(doneOf(second).outcome).toBe("handoff");
-    expect(h.handoffs().length).toBe(2);
-    expect(h.status()).toBe("handed_off");
+    expect((await h.handoffs()).length).toBe(2);
+    expect((await h.status())).toBe("handed_off");
   });
 
   test("a handoff that cannot be created is reported as handoff_failed, not handoff", async () => {
@@ -313,14 +311,14 @@ describe("escalation and safety", () => {
     const ev = await h.send("Quiero hablar con un agente");
     expect(doneOf(ev).outcome).toBe("handoff_failed");
     expect(messageOf(ev)).toBe(render("handoff_failed", "es"));
-    expect(h.handoffs()).toEqual([]);
-    expect(h.status()).not.toBe("handed_off");
+    expect((await h.handoffs())).toEqual([]);
+    expect((await h.status())).not.toBe("handed_off");
   });
 
   test("every node leaves a span", async () => {
     const h = await harness({ script: byPurpose({}, "Su saldo es 1200.50 USD.") });
     await h.send("¿Cuál es mi saldo?");
-    const names = listSpans(h.ops, h.sessionId).map((s) => s.name);
+    const names = (await listSpans(h.ops, h.sessionId)).map((s) => s.name);
     expect(names).toContain("bank.node.router");
     expect(names).toContain("bank.node.policy");
     expect(names).toContain("chat gemini-3.8-flash");

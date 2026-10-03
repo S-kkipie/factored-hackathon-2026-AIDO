@@ -1,6 +1,6 @@
-import type { Database } from "bun:sqlite";
 import { SignJWT, errors, jwtVerify } from "jose";
 import type { ServerConfig } from "./config";
+import type { Sql } from "./db/sql";
 import type { ServingDb } from "./db/serving";
 import { type Val, val } from "./provenance";
 import type { RuleId } from "./rules";
@@ -34,22 +34,21 @@ export interface Auth {
   /** Verifies a token; by default only `active` sessions pass. Read-only endpoints may also allow `handed_off`. */
   verify(token: string, allow?: readonly SessionStatus[]): Promise<Session & { status: SessionStatus }>;
   /** Ends a session: its tokens stop verifying immediately. */
-  revoke(sessionId: string): void;
-  setStatus(sessionId: string, status: SessionStatus): void;
+  revoke(sessionId: string): Promise<void>;
+  setStatus(sessionId: string, status: SessionStatus): Promise<void>;
 }
 
 type AuthConfig = Pick<ServerConfig, "jwtSecret" | "sessionTtlSeconds" | "demoPin" | "agentPin">;
 
-export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, now: () => number = Date.now): Auth {
+export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Sql, now: () => number = Date.now): Auth {
   const issue = async (role: Role, customerId: string | null, language: Language) => {
     const sessionId = crypto.randomUUID();
     const iat = Math.floor(now() / 1000);
     const exp = iat + cfg.sessionTtlSeconds;
-    ops
-      .query(
-        "insert into sessions (session_id, customer_id, role, language, created_at, expires_at) values (?, ?, ?, ?, ?, ?)",
-      )
-      .run(sessionId, customerId, role, language, new Date(iat * 1000).toISOString(), new Date(exp * 1000).toISOString());
+    await ops.run(
+      "insert into ops.sessions (session_id, customer_id, role, language, created_at, expires_at) values ($1, $2, $3, $4, $5, $6)",
+      [sessionId, customerId, role, language, new Date(iat * 1000).toISOString(), new Date(exp * 1000).toISOString()],
+    );
     const token = await new SignJWT({ sid: sessionId, role, lang: language })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(customerId ?? "agent")
@@ -66,15 +65,15 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
     return { token, session };
   };
 
-  const setStatus = (sessionId: string, status: SessionStatus): void => {
+  const setStatus = async (sessionId: string, status: SessionStatus): Promise<void> => {
     if (!SESSION_STATUSES.includes(status)) throw new AuthError("IN_AUTH_002", `invalid session status '${String(status)}'`);
-    const changed = ops.query("update sessions set status = ? where session_id = ?").run(status, sessionId).changes;
+    const changed = await ops.run("update ops.sessions set status = $1 where session_id = $2", [status, sessionId]);
     if (changed === 0) throw new AuthError("IN_AUTH_002", `unknown session ${sessionId}`);
   };
 
   return {
     async login(persona, pin, language) {
-      const user = serving.demoUsers().find((d) => d.persona === persona);
+      const user = (await serving.demoUsers()).find((d) => d.persona === persona);
       if (!user || pin !== cfg.demoPin) throw new AuthError("IN_AUTH_001", "invalid demo credentials");
       return issue("customer", user.customer_id, language);
     },
@@ -92,11 +91,10 @@ export function createAuth(cfg: AuthConfig, serving: ServingDb, ops: Database, n
       }
       const sessionId = payload.sid;
       if (typeof sessionId !== "string" || sessionId.length === 0) throw new AuthError("IN_AUTH_002", "token has no session");
-      const row = ops
-        .query<{ status: string; language: Language; role: Role; customer_id: string | null }, [string]>(
-          "select status, language, role, customer_id from sessions where session_id = ?",
-        )
-        .get(sessionId);
+      const row = await ops.one<{ status: string; language: Language; role: Role; customer_id: string | null }>(
+        "select status, language, role, customer_id from ops.sessions where session_id = $1",
+        [sessionId],
+      );
       if (!row || !allow.includes(row.status as SessionStatus)) {
         throw new AuthError("IN_SESSION_REVOKED", "session is not active");
       }

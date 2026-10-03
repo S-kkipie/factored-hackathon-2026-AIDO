@@ -1,4 +1,3 @@
-import type { Database } from "bun:sqlite";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import {
   BaseCheckpointSaver,
@@ -11,11 +10,13 @@ import {
   WRITES_IDX_MAP,
   copyCheckpoint,
 } from "@langchain/langgraph-checkpoint";
+import type { Param, Sql } from "../db/sql";
 
 /**
- * LangGraph checkpoint saver on `bun:sqlite`, stored in ops.sqlite. The official SqliteSaver needs better-sqlite3,
- * which Bun cannot load; this is the same table layout with the subset of behavior our graph uses (no pending-send
- * migration from checkpoint format < 4, which this project never wrote).
+ * LangGraph checkpoint saver on our `Sql` seam (Supabase Postgres or PGlite), tables `ops.checkpoints` and
+ * `ops.writes` (created by the Supabase migration). Same layout as the official savers, with the subset of behavior
+ * our graph uses (no pending-send migration from checkpoint format < 4, which this project never wrote). The
+ * official PostgresSaver needs `pg` and its own schema management; this one shares the server's connection.
  */
 interface CheckpointRow {
   thread_id: string;
@@ -34,36 +35,29 @@ interface WriteRow {
   value: Uint8Array | string | null;
 }
 
-const SCHEMA = `
-  create table if not exists checkpoints (
-    thread_id text not null, checkpoint_ns text not null default '', checkpoint_id text not null,
-    parent_checkpoint_id text, type text, checkpoint blob, metadata blob,
-    primary key (thread_id, checkpoint_ns, checkpoint_id));
-  create table if not exists writes (
-    thread_id text not null, checkpoint_ns text not null default '', checkpoint_id text not null,
-    task_id text not null, idx integer not null, channel text not null, type text, value blob,
-    primary key (thread_id, checkpoint_ns, checkpoint_id, task_id, idx));
-`;
+const CHECKPOINT_COLUMNS = "thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, type, checkpoint, metadata";
 
-export class BunSqliteSaver extends BaseCheckpointSaver {
-  constructor(private readonly db: Database) {
+/** postgres.js returns bytea as Buffer; the serializer wants a plain Uint8Array view. */
+const bytes = (v: Uint8Array | string): Uint8Array | string =>
+  typeof v === "string" ? v : new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+
+export class SqlCheckpointSaver extends BaseCheckpointSaver {
+  constructor(private readonly db: Sql) {
     super();
-    db.exec(SCHEMA);
   }
 
   private async toTuple(row: CheckpointRow): Promise<CheckpointTuple> {
-    const writes = this.db
-      .query<WriteRow, [string, string, string]>(
-        "select task_id, channel, type, value from writes where thread_id = ? and checkpoint_ns = ? and checkpoint_id = ? order by task_id, idx",
-      )
-      .all(row.thread_id, row.checkpoint_ns, row.checkpoint_id);
+    const writes = await this.db.all<WriteRow>(
+      "select task_id, channel, type, value from ops.writes where thread_id = $1 and checkpoint_ns = $2 and checkpoint_id = $3 order by task_id, idx",
+      [row.thread_id, row.checkpoint_ns, row.checkpoint_id],
+    );
     const type = row.type ?? "json";
     return {
       config: {
         configurable: { thread_id: row.thread_id, checkpoint_ns: row.checkpoint_ns, checkpoint_id: row.checkpoint_id },
       },
-      checkpoint: (await this.serde.loadsTyped(type, row.checkpoint)) as Checkpoint,
-      metadata: (await this.serde.loadsTyped(type, row.metadata)) as CheckpointMetadata,
+      checkpoint: (await this.serde.loadsTyped(type, bytes(row.checkpoint))) as Checkpoint,
+      metadata: (await this.serde.loadsTyped(type, bytes(row.metadata))) as CheckpointMetadata,
       parentConfig: row.parent_checkpoint_id
         ? {
             configurable: {
@@ -76,7 +70,11 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
       pendingWrites: await Promise.all(
         writes.map(
           async (w) =>
-            [w.task_id, w.channel, await this.serde.loadsTyped(w.type ?? "json", w.value ?? "")] as [string, string, unknown],
+            [w.task_id, w.channel, await this.serde.loadsTyped(w.type ?? "json", w.value === null ? "" : bytes(w.value))] as [
+              string,
+              string,
+              unknown,
+            ],
         ),
       ),
     };
@@ -86,40 +84,33 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
     const { thread_id, checkpoint_ns = "", checkpoint_id } = config.configurable ?? {};
     if (typeof thread_id !== "string") return undefined;
     const row = checkpoint_id
-      ? this.db
-          .query<CheckpointRow, [string, string, string]>(
-            "select * from checkpoints where thread_id = ? and checkpoint_ns = ? and checkpoint_id = ?",
-          )
-          .get(thread_id, checkpoint_ns, String(checkpoint_id))
-      : this.db
-          .query<CheckpointRow, [string, string]>(
-            "select * from checkpoints where thread_id = ? and checkpoint_ns = ? order by checkpoint_id desc limit 1",
-          )
-          .get(thread_id, checkpoint_ns);
+      ? await this.db.one<CheckpointRow>(
+          `select ${CHECKPOINT_COLUMNS} from ops.checkpoints where thread_id = $1 and checkpoint_ns = $2 and checkpoint_id = $3`,
+          [thread_id, checkpoint_ns, String(checkpoint_id)],
+        )
+      : await this.db.one<CheckpointRow>(
+          `select ${CHECKPOINT_COLUMNS} from ops.checkpoints where thread_id = $1 and checkpoint_ns = $2 order by checkpoint_id desc limit 1`,
+          [thread_id, checkpoint_ns],
+        );
     return row ? this.toTuple(row) : undefined;
   }
 
   async *list(config: RunnableConfig, options?: CheckpointListOptions): AsyncGenerator<CheckpointTuple> {
     const where: string[] = [];
-    const args: string[] = [];
+    const args: Param[] = [];
+    const add = (clause: string, value: string) => {
+      args.push(value);
+      where.push(`${clause} $${args.length}`);
+    };
     const { thread_id, checkpoint_ns } = config.configurable ?? {};
-    if (typeof thread_id === "string") {
-      where.push("thread_id = ?");
-      args.push(thread_id);
-    }
-    if (typeof checkpoint_ns === "string") {
-      where.push("checkpoint_ns = ?");
-      args.push(checkpoint_ns);
-    }
+    if (typeof thread_id === "string") add("thread_id =", thread_id);
+    if (typeof checkpoint_ns === "string") add("checkpoint_ns =", checkpoint_ns);
     const before = options?.before?.configurable?.checkpoint_id;
-    if (before !== undefined) {
-      where.push("checkpoint_id < ?");
-      args.push(String(before));
-    }
-    const sql = `select * from checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by checkpoint_id desc`;
+    if (before !== undefined) add("checkpoint_id <", String(before));
+    const sql = `select ${CHECKPOINT_COLUMNS} from ops.checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by checkpoint_id desc`;
     let yielded = 0;
     const limit = options?.limit ? Math.max(1, Math.trunc(options.limit)) : undefined;
-    for (const row of this.db.query<CheckpointRow, string[]>(sql).all(...args)) {
+    for (const row of await this.db.all<CheckpointRow>(sql, args)) {
       const tuple = await this.toTuple(row);
       const filter = options?.filter ?? {};
       const meta = tuple.metadata as Record<string, unknown> | undefined;
@@ -146,11 +137,13 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
       this.serde.dumpsTyped(metadata),
     ]);
     if (type !== metaType) throw new Error("checkpoint and metadata serialized to different types");
-    this.db
-      .query(
-        "insert or replace into checkpoints (thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, type, checkpoint, metadata) values (?, ?, ?, ?, ?, ?, ?)",
-      )
-      .run(thread_id, checkpoint_ns, checkpoint.id, parent === undefined ? null : String(parent), type, cp, meta);
+    await this.db.run(
+      `insert into ops.checkpoints (${CHECKPOINT_COLUMNS}) values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (thread_id, checkpoint_ns, checkpoint_id) do update set
+         parent_checkpoint_id = excluded.parent_checkpoint_id, type = excluded.type,
+         checkpoint = excluded.checkpoint, metadata = excluded.metadata`,
+      [thread_id, checkpoint_ns, checkpoint.id, parent === undefined ? null : String(parent), type, cp, meta],
+    );
     return { configurable: { thread_id, checkpoint_ns, checkpoint_id: checkpoint.id } };
   }
 
@@ -165,28 +158,29 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
       writes.map(async ([channel, value], idx) => {
         const [type, data] = await this.serde.dumpsTyped(value);
         const writeIdx = WRITES_IDX_MAP[channel] ?? idx;
-        return [thread_id, checkpoint_ns, String(checkpoint_id), taskId, writeIdx, channel, type, data, writeIdx < 0] as const;
+        return { args: [thread_id, checkpoint_ns, String(checkpoint_id), taskId, writeIdx, channel, type, data] as Param[], special: writeIdx < 0 };
       }),
     );
-    const stmtReplace = this.db.query(
-      `insert or replace into writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const stmtIgnore = this.db.query(
-      `insert or ignore into writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    this.db.transaction(() => {
+    const insert =
+      "insert into ops.writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) values ($1, $2, $3, $4, $5, $6, $7, $8)";
+    const key = "(thread_id, checkpoint_ns, checkpoint_id, task_id, idx)";
+    // Special channels (errors, interrupts) are replaced; regular writes keep the first value (upsert-or-ignore).
+    await this.db.tx(async (tx) => {
       for (const r of rows) {
-        const [threadId, ns, cpId, task, idx, channel, type, value, isSpecial] = r;
-        const stmt = isSpecial ? stmtReplace : stmtIgnore;
-        stmt.run(threadId, ns, cpId, task, idx, channel, type, value);
+        await tx.run(
+          r.special
+            ? `${insert} on conflict ${key} do update set channel = excluded.channel, type = excluded.type, value = excluded.value`
+            : `${insert} on conflict ${key} do nothing`,
+          r.args,
+        );
       }
-    })();
+    });
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    this.db.transaction(() => {
-      this.db.query("delete from checkpoints where thread_id = ?").run(threadId);
-      this.db.query("delete from writes where thread_id = ?").run(threadId);
-    })();
+    await this.db.tx(async (tx) => {
+      await tx.run("delete from ops.checkpoints where thread_id = $1", [threadId]);
+      await tx.run("delete from ops.writes where thread_id = $1", [threadId]);
+    });
   }
 }

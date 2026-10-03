@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Sql } from "../db/sql";
 import { BudgetError, type CallCounter, type CircuitBreaker, checkBudget, recordUsage } from "../gates/budget";
 import { BUDGETS, type Budgets } from "../policy/config";
 import type { RuleIdWithPrefix } from "../rules";
@@ -21,7 +21,7 @@ export class ModelUnavailable extends Error {
 
 export interface GatewayDeps {
   llm: Llm | null;
-  ops: Database;
+  ops: Sql;
   sessionId: string;
   safeMode: boolean;
   breaker: CircuitBreaker;
@@ -54,7 +54,7 @@ export function createGateway(d: GatewayDeps): ModelGateway {
     async call(purpose, req) {
       if (d.safeMode || d.llm === null) throw new ModelUnavailable("BUD_SAFE_MODE", "model calls are disabled");
       const llm = d.llm;
-      const budget = checkBudget(d.ops, d.sessionId, d.day, d.budgets ?? BUDGETS);
+      const budget = await checkBudget(d.ops, d.sessionId, d.day, d.budgets ?? BUDGETS);
       if (!budget.ok) throw new ModelUnavailable(budget.ruleId, "budget exhausted");
       if (!d.breaker.canCall()) throw new ModelUnavailable("BUD_BREAKER", "provider circuit is open");
       try {
@@ -83,7 +83,7 @@ export function createGateway(d: GatewayDeps): ModelGateway {
           }
           d.breaker.success();
           const usd = costUsd(res.model, res.inputTokens, res.outputTokens);
-          recordUsage(d.ops, d.sessionId, d.day, res.inputTokens + res.outputTokens, usd);
+          await recordUsage(d.ops, d.sessionId, d.day, res.inputTokens + res.outputTokens, usd);
           set("gen_ai.response.model", res.model);
           set("gen_ai.usage.input_tokens", res.inputTokens);
           set("gen_ai.usage.output_tokens", res.outputTokens);

@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Sql } from "../db/sql";
 import { canonicalJson, sha256Hex } from "../hash";
 import type { RuleIdWithPrefix } from "../rules";
 
@@ -14,25 +14,27 @@ export type NonceRule = Extract<RuleIdWithPrefix<"TL">, `TL_NONCE_${string}`>;
 const hashPayload = (payload: unknown) => sha256Hex(canonicalJson(payload));
 
 /** Issues a single-use nonce that only a UI confirmation can return; chat text can never confirm. */
-export function issueNonce(ops: Database, ctx: NonceContext, nowMs: number, ttlMs = 10 * 60_000): string {
+export async function issueNonce(ops: Sql, ctx: NonceContext, nowMs: number, ttlMs = 10 * 60_000): Promise<string> {
   const nonce = crypto.randomUUID();
-  ops
-    .query("insert into nonces (nonce, session_id, interrupt_id, payload_hash, expires_at) values (?, ?, ?, ?, ?)")
-    .run(nonce, ctx.sessionId, ctx.interruptId, hashPayload(ctx.payload), nowMs + ttlMs);
+  await ops.run(
+    "insert into ops.nonces (nonce, session_id, interrupt_id, payload_hash, expires_at) values ($1, $2, $3, $4, $5)",
+    [nonce, ctx.sessionId, ctx.interruptId, hashPayload(ctx.payload), nowMs + ttlMs],
+  );
   return nonce;
 }
 
-export function consumeNonce(
-  ops: Database,
+export async function consumeNonce(
+  ops: Sql,
   ctx: NonceContext & { nonce: string },
   nowMs: number,
-): { ok: true } | { ok: false; ruleId: NonceRule } {
-  const row = ops
-    .query<
-      { session_id: string; interrupt_id: string; payload_hash: string; expires_at: number; used_at: number | null },
-      [string]
-    >("select session_id, interrupt_id, payload_hash, expires_at, used_at from nonces where nonce = ?")
-    .get(ctx.nonce);
+): Promise<{ ok: true } | { ok: false; ruleId: NonceRule }> {
+  const row = await ops.one<{
+    session_id: string;
+    interrupt_id: string;
+    payload_hash: string;
+    expires_at: number;
+    used_at: number | null;
+  }>("select session_id, interrupt_id, payload_hash, expires_at, used_at from ops.nonces where nonce = $1", [ctx.nonce]);
   if (!row) return { ok: false, ruleId: "TL_NONCE_UNKNOWN" };
   if (row.used_at !== null) return { ok: false, ruleId: "TL_NONCE_USED" };
   if (nowMs > row.expires_at) return { ok: false, ruleId: "TL_NONCE_EXPIRED" };
@@ -43,8 +45,7 @@ export function consumeNonce(
   ) {
     return { ok: false, ruleId: "TL_NONCE_MISMATCH" };
   }
-  const changed = ops
-    .query("update nonces set used_at = ? where nonce = ? and used_at is null")
-    .run(nowMs, ctx.nonce).changes;
+  // Single use even across connections: only one UPDATE can flip used_at from null.
+  const changed = await ops.run("update ops.nonces set used_at = $1 where nonce = $2 and used_at is null", [nowMs, ctx.nonce]);
   return changed === 1 ? { ok: true } : { ok: false, ruleId: "TL_NONCE_USED" };
 }

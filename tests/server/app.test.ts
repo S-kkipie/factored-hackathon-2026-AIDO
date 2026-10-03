@@ -107,7 +107,7 @@ describe("AG-UI run", () => {
     const it = outcome.interrupts[0]!;
 
     const typedYes = await run(s.token, s.sessionId, say("sí, confirmo"));
-    expect(h.disputes()).toEqual([]);
+    expect((await h.disputes())).toEqual([]);
     expect(typedYes.events.at(-1)?.outcome).toEqual({ type: "success" });
 
     const again = await run(s.token, s.sessionId, say("No reconozco un cargo de 45 dólares en Super Ahorro"));
@@ -116,7 +116,7 @@ describe("AG-UI run", () => {
       resume: [{ interruptId: it2.id, status: "resolved", payload: { nonce: it2.metadata.nonce, approved: true } }],
     });
     expect(done.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("D-");
-    expect(h.disputes().length).toBe(1);
+    expect((await h.disputes()).length).toBe(1);
     expect(it.id).not.toBe(it2.id);
   });
 

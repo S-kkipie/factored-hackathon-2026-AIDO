@@ -28,12 +28,12 @@ export const routerNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnU
   const route = await d.router.route(s.message, s.language);
   const rules: RuleId[] = [];
   if (s.injection) {
-    addRisk(d.ops, d.sessionId, "injectionSignal");
+    await addRisk(d.ops, d.sessionId, "injectionSignal");
     rules.push("IN_INJECTION");
   }
   if (route.label !== "greeting" && route.confidence < POLICY.routerThreshold) rules.push("RT_LOW_CONFIDENCE");
   else if (route.label === "out_of_scope") rules.push("RT_OUT_OF_SCOPE");
-  audit(d, "route", rules, { label: route.label, confidence: route.confidence, router: route.router });
+  await audit(d, "route", rules, { label: route.label, confidence: route.confidence, router: route.router });
   return { route, ruleIds: addRules(s.ruleIds, ...rules) };
 };
 
@@ -61,13 +61,13 @@ export const clarifyNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
       : hadCriteria
         ? render("no_match", d.language)
         : render("clarify_intent", d.language);
-  audit(d, "clarify", s.ruleIds, { candidates: s.candidates.length });
+  await audit(d, "clarify", s.ruleIds, { candidates: s.candidates.length });
   return { reply, outcome: "clarify" };
 };
 
 export const abstainNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
-  addRisk(d.ops, d.sessionId, "abstain");
-  audit(d, "abstain", s.ruleIds);
+  await addRisk(d.ops, d.sessionId, "abstain");
+  await audit(d, "abstain", s.ruleIds);
   return { reply: render("abstain", d.language), outcome: "abstain" };
 };
 
@@ -81,14 +81,14 @@ export const extractNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
       d.gateway.call("extract_slots", { ...prompt, json: true, maxOutputTokens: 400 }),
     );
     if (!res.ok) {
-      audit(d, "extract", ["SC_INVALID"], { attempts: res.attempts });
+      await audit(d, "extract", ["SC_INVALID"], { attempts: res.attempts });
       return { slots: val<Slots>({}, "llm"), ruleIds: addRules(s.ruleIds, "SC_INVALID") };
     }
-    audit(d, "extract", [], { fields: Object.keys(res.value).sort() });
+    await audit(d, "extract", [], { fields: Object.keys(res.value).sort() });
     return { slots: val(res.value, "llm") };
   } catch (e) {
     if (!(e instanceof ModelUnavailable)) throw e;
-    audit(d, "extract", [e.ruleId]);
+    await audit(d, "extract", [e.ruleId]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, e.ruleId) };
   }
 };
@@ -128,13 +128,13 @@ export const resolveNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
           : rows.filter((t) => Math.abs(t.amount - slots.amount!) < 0.01 || Math.abs((t.amount_usd ?? -1) - slots.amount!) < 0.01);
     }
     const unique = [...new Map(found.map((t) => [t.transaction_id, t])).values()];
-    audit(d, "resolve", [], { explicit, found: unique.length });
+    await audit(d, "resolve", [], { explicit, found: unique.length });
     // Explicit ids are taken as a set (policy decides about many); a search hit must be unambiguous.
     if (explicit || unique.length === 1) return { targets: unique.map((t) => val(t, "db")), candidates: [] };
     return { targets: [], candidates: unique.slice(0, 5) };
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
-    audit(d, "resolve", [e.ruleId]);
+    await audit(d, "resolve", [e.ruleId]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, e.ruleId) };
   }
 };
@@ -150,26 +150,26 @@ export const afterResolve = (s: TurnValues): string => {
 /** Gate 4: the pure policy engine decides; this node only gathers its `db`/`jwt` inputs. */
 export const policyNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUpdate> => {
   const intent = intentOf(s);
-  const customer = d.serving.customer(d.customerId.v);
+  const customer = await d.serving.customer(d.customerId.v);
   if (!customer) {
-    audit(d, "policy", ["POL_STATUS"], { reason: "customer_missing" });
+    await audit(d, "policy", ["POL_STATUS"], { reason: "customer_missing" });
     return {
       decision: { action: "escalate", ruleIds: ["POL_STATUS"], policyVersion: POLICY.version },
       ruleIds: addRules(s.ruleIds, "POL_STATUS"),
     };
   }
-  const history = d.tools.getDisputeHistory(d.customerId).v;
+  const history = (await d.tools.getDisputeHistory(d.customerId)).v;
   const decision = decide({
     intent,
     customer,
     targets: s.targets,
     disputedTransactionIds: history.disputedTransactionIds,
     repeatComplainer: history.repeatComplainer,
-    riskScore: getRisk(d.ops, d.sessionId),
+    riskScore: await getRisk(d.ops, d.sessionId),
   });
-  if (decision.ruleIds.includes("PROV_001")) addRisk(d.ops, d.sessionId, "provenanceViolation");
-  if (decision.action === "deny") addRisk(d.ops, d.sessionId, "policyDeny");
-  audit(d, "policy", decision.ruleIds, {
+  if (decision.ruleIds.includes("PROV_001")) await addRisk(d.ops, d.sessionId, "provenanceViolation");
+  if (decision.action === "deny") await addRisk(d.ops, d.sessionId, "policyDeny");
+  await audit(d, "policy", decision.ruleIds, {
     action: decision.action,
     policyVersion: decision.policyVersion,
     targets: s.targets.map((t) => t.v.transaction_id),
@@ -209,7 +209,7 @@ export const fetchNode = (d: GraphDeps) => async (s: TurnValues): Promise<TurnUp
     return { results: { transactions: val(s.targets.map((t) => t.v), "db") } };
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
-    audit(d, "fetch", [e.ruleId]);
+    await audit(d, "fetch", [e.ruleId]);
     return { forceHandoff: true, ruleIds: addRules(s.ruleIds, e.ruleId) };
   }
 };
@@ -246,12 +246,12 @@ export const respondNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
       const cites = txs.length === 0 || txs.some((t) => res.value.reply.includes(t.transaction_id));
       if (check.ok && cites) reply = res.value.reply;
       else rules.push(...check.ruleIds, ...(cites ? [] : (["RS_CITE"] as const)));
-      if (check.ruleIds.includes("RS_CANARY")) addRisk(d.ops, d.sessionId, "injectionSignal");
+      if (check.ruleIds.includes("RS_CANARY")) await addRisk(d.ops, d.sessionId, "injectionSignal");
     }
   } catch (e) {
     if (!(e instanceof ModelUnavailable)) throw e;
     rules.push(e.ruleId);
   }
-  audit(d, "respond", rules, { fallback: reply === fallback });
+  await audit(d, "respond", rules, { fallback: reply === fallback });
   return { reply, outcome: "answered", ruleIds: addRules(s.ruleIds, ...rules) };
 };
