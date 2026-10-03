@@ -17,6 +17,7 @@ export class SpendCapError extends Error {
  */
 export class RunBudget {
   private readonly start: number;
+  private reserved = 0;
 
   constructor(
     readonly ledger: SpendLedger,
@@ -32,8 +33,15 @@ export class RunBudget {
   }
 
   check(estimateUsd: number): void {
-    if (!this.ledger.allows(estimateUsd)) throw new SpendCapError("project LLM spend cap reached");
-    if (this.spent() + estimateUsd > this.runLimitUsd) throw new SpendCapError(`run limit of $${this.runLimitUsd} reached`);
+    if (this.ledger.total() + this.reserved + estimateUsd > this.ledger.capUsd)
+      throw new SpendCapError("project LLM spend cap reached");
+    if (this.spent() + this.reserved + estimateUsd > this.runLimitUsd)
+      throw new SpendCapError(`run limit of $${this.runLimitUsd} reached`);
+    this.reserved += estimateUsd;
+  }
+
+  release(estimateUsd: number): void {
+    this.reserved -= estimateUsd;
   }
 
   record(usd: number, model: string, purpose: string): void {
@@ -46,10 +54,15 @@ export function meteredLlm(llm: Llm, budget: RunBudget, purpose: string): Llm {
   return {
     model: llm.model,
     async generate(req) {
-      budget.check(costUsd(llm.model, Math.ceil((req.system.length + req.user.length) / 3), req.maxOutputTokens));
-      const res = await llm.generate(req);
-      budget.record(costUsd(res.model, res.inputTokens, res.outputTokens), res.model, purpose);
-      return res;
+      const estimate = costUsd(llm.model, Math.ceil((req.system.length + req.user.length) / 3), req.maxOutputTokens);
+      budget.check(estimate);
+      try {
+        const res = await llm.generate(req);
+        budget.record(costUsd(res.model, res.inputTokens, res.outputTokens), res.model, purpose);
+        return res;
+      } finally {
+        budget.release(estimate);
+      }
     },
   };
 }
@@ -60,10 +73,15 @@ export function meteredEmbedder(embedder: Embedder, budget: RunBudget, purpose: 
     model: embedder.model,
     dim: embedder.dim,
     async embed(texts, signal) {
-      budget.check(costUsd(embedder.model, estimateTokens(texts), 0));
-      const res = await embedder.embed(texts, signal);
-      budget.record(costUsd(embedder.model, res.inputTokens, 0), embedder.model, purpose);
-      return res;
+      const estimate = costUsd(embedder.model, estimateTokens(texts), 0);
+      budget.check(estimate);
+      try {
+        const res = await embedder.embed(texts, signal);
+        budget.record(costUsd(embedder.model, res.inputTokens, 0), embedder.model, purpose);
+        return res;
+      } finally {
+        budget.release(estimate);
+      }
     },
   };
 }

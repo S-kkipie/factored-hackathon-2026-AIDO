@@ -28,8 +28,13 @@ const BATCH = 100;
  * gemini-embedding-001 with task type CLASSIFICATION. Vectors truncated to `dim` dimensions are not unit length,
  * so they are normalized here (the model card asks for normalization below 3072 dimensions).
  */
-export function createGeminiEmbedder(apiKey: string, model = "gemini-embedding-001", dim = 768): Embedder {
-  const ai = new GoogleGenAI({ apiKey });
+export function createGeminiEmbedder(
+  apiKey: string,
+  model = "gemini-embedding-001",
+  dim = 768,
+  client?: { embedContent(params: unknown): Promise<{ embeddings?: { values?: number[] }[] }> },
+): Embedder {
+  const c = client ?? new GoogleGenAI({ apiKey }).models;
   return {
     model,
     dim,
@@ -37,7 +42,7 @@ export function createGeminiEmbedder(apiKey: string, model = "gemini-embedding-0
       const vectors: number[][] = [];
       for (let i = 0; i < texts.length; i += BATCH) {
         const batch = texts.slice(i, i + BATCH);
-        const res = await ai.models.embedContent({
+        const res = await c.embedContent({
           model,
           contents: [...batch],
           config: { taskType: "CLASSIFICATION", outputDimensionality: dim, abortSignal: signal },
