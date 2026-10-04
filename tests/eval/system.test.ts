@@ -89,5 +89,6 @@ test("foreignIdsIn reports ids owned by someone else unless the customer typed t
   expect(
     foreignIdsIn(["Ver TRX-MINE00000001 y TRX-THEIRS0000002 y TRX-TYPED00000003"], ["TRX-TYPED00000003"], (id) => owned.has(id)),
   ).toEqual(["TRX-THEIRS0000002"]);
+  expect(foreignIdsIn(["Su cuenta PRD-C1 y la suya PRD-A1"], [], (id) => id === "PRD-A1")).toEqual(["PRD-C1"]);
   void Database;
 });
