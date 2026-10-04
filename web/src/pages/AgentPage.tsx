@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { HandoffCardView } from "../agent/HandoffCardView";
+import { Wordmark } from "../Brand";
 import { ApiError, type ChatMessage, type QueueItem } from "../lib/api";
 import { agentApi, clearAgent, readAgent, writeAgent } from "../session";
 
@@ -31,21 +32,21 @@ function AgentLogin({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <section className="login panel">
-      <h1>Consola de agentes</h1>
-      <p className="muted">Casos derivados por el asistente, con contexto estructurado.</p>
-      <form onSubmit={submit} className="login-form">
+    <main className="auth single">
+      <form onSubmit={submit} className="auth-form card">
+        <Wordmark size={36} sub="Consola de agentes" />
+        <p className="muted">Casos derivados por el asistente, con contexto estructurado.</p>
         <label className="field">
           <span>PIN de agente</span>
           <input inputMode="numeric" autoComplete="off" maxLength={12} value={pin} onChange={(e) => setPin(e.target.value)} required />
           <small className="muted">PIN de demostración: 1357</small>
         </label>
         {error && <p className="notice error">{error}</p>}
-        <button type="submit" className="primary" disabled={pin.length === 0}>
+        <button type="submit" className="primary big" disabled={pin.length === 0}>
           Entrar
         </button>
       </form>
-    </section>
+    </main>
   );
 }
 

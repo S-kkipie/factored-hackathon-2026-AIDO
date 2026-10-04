@@ -2,8 +2,15 @@ export type Lang = "es" | "pt";
 
 export interface Copy {
   brand: string;
+  brandTagline: string;
   loginTitle: string;
   loginLead: string;
+  loginSubtitle: string;
+  heroPoints: string[];
+  heroPreviewQuestion: string;
+  heroPreviewAnswer: string;
+  demoNote: string;
+  agentConsole: string;
   persona: string;
   language: string;
   pin: string;
@@ -36,8 +43,15 @@ export interface Copy {
 export const T: Record<Lang, Copy> = {
   es: {
     brand: "LATAM Bank",
+    brandTagline: "Banca digital",
     loginTitle: "Atención al cliente",
     loginLead: "Elige un cliente de demostración. Cada uno activa un camino distinto de la política.",
+    loginSubtitle: "Atención al cliente asistida por IA: saldos, movimientos y disputas, a cualquier hora.",
+    heroPoints: ["Saldos y movimientos al instante", "Disputas en minutos, siempre con tu confirmación", "Un agente humano cuando lo necesites"],
+    heroPreviewQuestion: "No reconozco un cargo de 45 dólares en Super Ahorro",
+    heroPreviewAnswer: "Encontré el movimiento del 10 de junio. Confirma con el botón para registrar la disputa.",
+    demoNote: "Entorno de demostración con datos sintéticos.",
+    agentConsole: "Soy agente",
     persona: "Cliente de demostración",
     language: "Idioma",
     pin: "PIN",
@@ -68,8 +82,15 @@ export const T: Record<Lang, Copy> = {
   },
   pt: {
     brand: "LATAM Bank",
+    brandTagline: "Banco digital",
     loginTitle: "Atendimento ao cliente",
     loginLead: "Escolha um cliente de demonstração. Cada um ativa um caminho diferente da política.",
+    loginSubtitle: "Atendimento ao cliente com IA: saldo, extrato e contestações, a qualquer hora.",
+    heroPoints: ["Saldo e extrato na hora", "Contestações em minutos, sempre com sua confirmação", "Um atendente humano quando você precisar"],
+    heroPreviewQuestion: "Não reconheço uma cobrança de 45 dólares no Super Ahorro",
+    heroPreviewAnswer: "Encontrei a movimentação de 10 de junho. Confirme no botão para registrar a contestação.",
+    demoNote: "Ambiente de demonstração com dados sintéticos.",
+    agentConsole: "Sou atendente",
     persona: "Cliente de demonstração",
     language: "Idioma",
     pin: "PIN",

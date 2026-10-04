@@ -7,8 +7,9 @@ const HTML_HEADERS = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
   // Vite emits no inline scripts; inline style attributes (duration bars) need 'unsafe-inline' for styles only.
+  // Vite inlines small self-hosted @fontsource subsets as data: URIs, so font-src needs data: alongside 'self'.
   "content-security-policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
 };
 
 /**

@@ -26,6 +26,15 @@
   --warn-soft: #fbf1db;
   --user-bg: #0b5d4b;
   --user-ink: #ffffff;
+  /* Dark-emerald decorative surfaces only (login hero, agent rail) — the UI itself stays light. */
+  --emerald-900: #04231d;
+  --emerald-800: #062f27;
+  --emerald-700: #0a4a3c;
+  --emerald-600: #0f6b55;
+  --gold-300: #f3d27a;
+  --gold-600: #a8841a;
+  --nav-ink: #e7f1ec;
+  --nav-muted: #9fc2b4;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgb(16 35 30 / 6%);
@@ -116,17 +125,48 @@ input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visib
 .chip.mono { background: var(--coral-soft); border-color: transparent; color: var(--coral); font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* ── Login ────────────────────────────────────────────── */
-.login {
-  max-width: 560px; margin: 32px auto; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; box-shadow: var(--shadow); padding: 32px; position: relative; overflow: hidden;
+/* ── Login / auth ─────────────────────────────────────── */
+.auth { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; }
+.auth.single { grid-template-columns: 1fr; place-items: center; padding: 24px 16px; }
+.auth-hero {
+  position: relative; overflow: hidden; isolation: isolate; padding: 40px 56px; display: flex; flex-direction: column;
+  justify-content: space-between; gap: 32px; color: #fff;
+  background:
+    radial-gradient(700px 500px at 110% 110%, rgb(201 162 39 / 32%), transparent 60%),
+    radial-gradient(900px 600px at -20% -20%, rgb(255 255 255 / 9%), transparent 60%),
+    linear-gradient(155deg, #031c17, var(--emerald-800) 45%, var(--emerald-600));
 }
-.login::before {
-  content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
-  background: linear-gradient(90deg, var(--brand), var(--gold));
+.auth-hero > *:not(.guilloche):not(.waves) { position: relative; z-index: 1; }
+.auth-hero .wordmark-sub { color: rgb(255 255 255 / 72%); }
+.hero-rosette { width: 760px; height: 760px; right: -260px; top: -200px; color: var(--gold-300); }
+.hero-waves { left: 0; right: 0; bottom: 0; width: 100%; height: 34%; color: #fff; }
+.hero-main { display: flex; flex-direction: column; gap: 36px; }
+.hero-copy { max-width: 460px; }
+.hero-copy h1 { font-size: 2.5rem; letter-spacing: -0.03em; color: #fff; }
+.hero-copy p { font-size: 1.05rem; color: rgb(255 255 255 / 84%); margin-top: 12px; }
+.hero-points { list-style: none; padding: 0; margin: 22px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.hero-points li { display: flex; align-items: center; gap: 10px; color: rgb(255 255 255 / 90%); font-weight: 500; }
+.hero-check {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgb(243 210 122 / 18%);
+  color: var(--gold-300); flex: none;
 }
-.login h1 { margin: 8px 0 4px; font-size: 1.75rem; }
-.login-form { display: grid; gap: 18px; margin-top: 16px; }
+.hero-stage { position: relative; display: flex; align-items: flex-end; gap: 18px; min-height: 210px; }
+.hero-stage .bank-card { transform: rotate(-6deg) translateY(-6px); }
+.hero-chat { display: flex; flex-direction: column; gap: 10px; max-width: 320px; margin-left: -36px; margin-bottom: -6px; }
+.preview-bubble { padding: 12px 16px; border-radius: 16px; font-size: 0.92rem; backdrop-filter: blur(6px); box-shadow: 0 16px 34px -18px rgb(0 0 0 / 60%); }
+.preview-bubble.user { align-self: flex-end; background: rgb(255 255 255 / 92%); color: var(--text); border-bottom-right-radius: 4px; }
+.preview-bubble.assistant {
+  background: rgb(4 35 29 / 72%); border: 1px solid rgb(243 210 122 / 25%); border-bottom-left-radius: 4px;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.preview-bubble.assistant .logo { flex: none; margin-top: 1px; }
+.hero-foot { font-size: 0.8rem; color: rgb(255 255 255 / 65%); }
+.auth-panel { display: grid; place-items: center; padding: 40px 24px; background: var(--bg); }
+.auth-form { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 18px; }
+.auth-form.card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; box-shadow: var(--shadow); }
+.auth-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.auth-foot { text-align: center; font-size: 0.9rem; }
+.primary.big { padding: 12px 18px; font-size: 1rem; }
 fieldset { border: none; margin: 0; padding: 0; }
 legend { font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
 .personas { display: grid; gap: 8px; }
@@ -216,6 +256,8 @@ legend { font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
   border-radius: var(--radius); padding: 10px 14px; min-width: 120px; box-shadow: var(--shadow-sm);
 }
 .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.summary .stat:nth-child(2) { border-top-color: var(--gold); }
+.summary .stat:nth-child(3) { border-top-color: var(--coral); }
 .turn { margin-bottom: 16px; }
 .turn-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .steps { display: grid; gap: 4px; }
@@ -229,16 +271,103 @@ legend { font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
 /* ── Brand mark / wordmark (Brand.tsx) ────────────────── */
 .wordmark { display: inline-flex; align-items: center; gap: 10px; }
 .logo { flex: none; display: block; }
+.wordmark-text { display: flex; flex-direction: column; line-height: 1.1; }
 .wordmark-name { font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: var(--text); }
+.wordmark.light .wordmark-name { color: #fff; }
+.wordmark-sub { margin-top: 3px; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.02em; }
 .wm-i { position: relative; display: inline-block; }
 .wm-dot {
   position: absolute; left: 50%; top: -0.02em; width: 0.24em; height: 0.24em; transform: translateX(-50%) rotate(45deg);
   border-radius: 0.05em; background: linear-gradient(135deg, var(--gold), #a8841a);
 }
 
+/* Avatars next to chat bubbles: the AIDO mark for the assistant, a coral person glyph for a human agent. */
+.avatar { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; overflow: hidden; }
+.avatar.assistant { border-radius: 10px; box-shadow: 0 6px 14px -8px rgb(4 35 29 / 60%); }
+.avatar.agent { background: var(--coral-soft); color: var(--coral); border-radius: 50%; }
+
+/* Decorative security-print curves and bank card (Brand.tsx): purely ornamental, colored via currentColor. */
+.guilloche, .waves { position: absolute; pointer-events: none; user-select: none; }
+.bank-card {
+  position: relative; overflow: hidden; width: 300px; aspect-ratio: 1.586; border-radius: 18px; padding: 18px 20px;
+  color: #fff; display: flex; flex-direction: column; justify-content: space-between; flex: none;
+  background:
+    radial-gradient(420px 220px at 110% -20%, rgb(243 210 122 / 30%), transparent 60%),
+    linear-gradient(135deg, var(--emerald-600) 0%, #0a4a3c 48%, var(--emerald-900) 100%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 25%) inset, 0 30px 60px -24px rgb(4 35 29 / 70%), 0 12px 24px -12px rgb(4 35 29 / 50%);
+}
+.bank-card > *:not(.guilloche) { position: relative; z-index: 1; }
+.bank-card-rosette { width: 280px; height: 280px; right: -90px; top: -70px; color: var(--gold-300); }
+.bank-card-top { display: flex; justify-content: space-between; align-items: center; }
+.bank-card-label { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(255 255 255 / 78%); }
+.bank-card-chip { display: flex; align-items: center; gap: 10px; }
+.bank-card-chip > span {
+  width: 40px; height: 29px; border-radius: 7px;
+  background:
+    linear-gradient(90deg, transparent 47%, rgb(0 0 0 / 18%) 47% 53%, transparent 53%),
+    linear-gradient(0deg, transparent 30%, rgb(0 0 0 / 15%) 30% 34%, transparent 34% 66%, rgb(0 0 0 / 15%) 66% 70%, transparent 70%),
+    linear-gradient(135deg, #f6dd92, #c49a2c);
+}
+.contactless { color: rgb(255 255 255 / 80%); }
+.bank-card-number { font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.12em; text-shadow: 0 1px 1px rgb(0 0 0 / 30%); }
+.bank-card-bottom { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; letter-spacing: 0.12em; color: rgb(255 255 255 / 82%); }
+.bank-card-net { display: inline-flex; }
+.bank-card-net i { width: 20px; height: 20px; border-radius: 50%; display: block; }
+.bank-card-net i:first-child { background: rgb(243 210 122 / 90%); }
+.bank-card-net i:last-child { background: rgb(255 255 255 / 55%); margin-left: -8px; }
+
+/* ── Console rail (agent console chrome, Layout.tsx) ──── */
+.shell-with-rail { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.console-rail {
+  position: relative; overflow: hidden; padding: 20px 14px; display: flex; flex-direction: column; gap: 24px;
+  color: var(--nav-ink);
+  background:
+    radial-gradient(600px 400px at 0% 0%, rgb(255 255 255 / 6%), transparent 60%),
+    linear-gradient(180deg, var(--emerald-700), var(--emerald-800) 55%, var(--emerald-900));
+  border-right: 1px solid rgb(0 0 0 / 20%);
+}
+.console-rail > *:not(.guilloche) { position: relative; z-index: 1; }
+.sidebar-rosette { width: 420px; height: 420px; left: -160px; bottom: -180px; color: var(--gold-300); }
+.console-rail .side-nav { margin-top: -4px; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-link {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--nav-muted);
+  font-weight: 500; position: relative; text-decoration: none;
+}
+.side-link:hover { background: rgb(255 255 255 / 6%); color: #fff; text-decoration: none; }
+.side-link.active { background: rgb(255 255 255 / 10%); color: #fff; }
+.side-link.active::before {
+  content: ""; position: absolute; left: -14px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--gold-300);
+}
+.rail-main { max-width: 1180px; }
+
+/* ── Chat avatars (ChatPage.tsx) ──────────────────────── */
+.msg-row { display: flex; gap: 8px; align-items: flex-end; width: 100%; }
+.msg-row.user { justify-content: flex-end; }
+.msg-row.system { justify-content: center; }
+.msg-row .avatar { margin-bottom: 2px; }
+.msg-row .confirm-card { flex: 1; }
+.bubble.user, .bubble.assistant, .bubble.agent, .bubble.system { align-self: auto; }
+.presence { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 2px; }
+.presence.on { background: var(--success); }
+.presence.away { background: var(--coral); }
+
+/* ── Agent card sections (HandoffCardView.tsx) ────────── */
+.card-section ul.rule-list, .card-section ul.facts { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card-section ul.rule-list li { background: var(--coral-soft); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px; }
+.card-section ul.rule-list .rule-id { color: var(--coral); font-weight: 600; }
+.card-section ul.facts li { background: var(--surface-2); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px; }
+
 @media (prefers-reduced-motion: reduce) {
   .dot { animation: none; }
   button, .persona, .queue-item { transition: none; }
+}
+
+@media (max-width: 900px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-hero { display: none; }
+  .shell-with-rail { grid-template-columns: 1fr; }
+  .console-rail { display: none; }
 }
 
 @media (max-width: 760px) {
@@ -246,5 +375,5 @@ legend { font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
   .chat { height: calc(100vh - 100px); }
   .bubble { max-width: 92%; }
   .step { grid-template-columns: 110px 1fr 70px; }
-  .login { margin: 16px auto; padding: 24px; }
+  .auth-form.card { padding: 24px; }
 }

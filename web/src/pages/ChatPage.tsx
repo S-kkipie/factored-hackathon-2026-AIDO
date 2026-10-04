@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Avatar, Logo } from "../Brand";
 import { useChat } from "../chat/useChat";
 import { T, personaText, stepLabel } from "../lib/i18n";
 import { clearCustomer, customerApi, readCustomer, type StoredCustomer } from "../session";
@@ -56,9 +57,14 @@ function Chat({ session }: { session: StoredCustomer }) {
   return (
     <section className="chat" aria-label="Chat">
       <div className="chat-head">
-        <div>
-          <strong>{personaText(session.persona, session.language).name}</strong>
-          <span className="muted"> · {session.language.toUpperCase()}</span>
+        <div className="row" style={{ gap: 10 }}>
+          <Logo size={28} />
+          <div>
+            <strong>{personaText(session.persona, session.language).name}</strong>
+            <div className="muted">
+              <span className={`presence ${state.handedOff ? "away" : "on"}`} aria-hidden="true" /> {session.language.toUpperCase()}
+            </div>
+          </div>
         </div>
         <div className="row">
           <Link to="/trace/$session" params={{ session: session.sessionId }} target="_blank" rel="opener">
@@ -87,28 +93,34 @@ function Chat({ session }: { session: StoredCustomer }) {
       <div className="chat-log" ref={logRef} aria-live="polite">
         {state.lines.length === 0 && <p className="muted">{t.empty}</p>}
         {state.lines.map((l) => (
-          <div key={l.id} className={`bubble ${l.author}`}>
-            {who[l.author] && <span className="who">{who[l.author]}</span>}
-            {l.text}
+          <div key={l.id} className={`msg-row ${l.author}`}>
+            {(l.author === "assistant" || l.author === "agent") && <Avatar who={l.author} />}
+            <div className={`bubble ${l.author}`}>
+              {who[l.author] && <span className="who">{who[l.author]}</span>}
+              {l.text}
+            </div>
           </div>
         ))}
 
         {state.pending && (
-          <div className="confirm-card" role="group" aria-label={t.confirmTitle}>
-            <h3>{t.confirmTitle}</h3>
-            <div className="bubble assistant">{state.pending.message}</div>
-            {state.pending.expiresAt && (
-              <small className="muted">
-                {t.expiresAt} {time(state.pending.expiresAt)}
-              </small>
-            )}
-            <div className="actions">
-              <button type="button" className="primary" onClick={() => void answer(true)}>
-                {t.confirm}
-              </button>
-              <button type="button" onClick={() => void answer(false)}>
-                {t.cancel}
-              </button>
+          <div className="msg-row assistant">
+            <Avatar who="assistant" />
+            <div className="confirm-card" role="group" aria-label={t.confirmTitle}>
+              <h3>{t.confirmTitle}</h3>
+              <div className="bubble assistant">{state.pending.message}</div>
+              {state.pending.expiresAt && (
+                <small className="muted">
+                  {t.expiresAt} {time(state.pending.expiresAt)}
+                </small>
+              )}
+              <div className="actions">
+                <button type="button" className="primary" onClick={() => void answer(true)}>
+                  {t.confirm}
+                </button>
+                <button type="button" onClick={() => void answer(false)}>
+                  {t.cancel}
+                </button>
+              </div>
             </div>
           </div>
         )}

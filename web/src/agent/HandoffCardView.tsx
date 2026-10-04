@@ -18,10 +18,11 @@ export function HandoffCardView({ card }: { card: HandoffCard }) {
       {card.ruleIds.length > 0 && (
         <div className="card-section">
           <h4>Por qué se derivó</h4>
-          <ul>
+          <ul className="rule-list">
             {card.ruleIds.map((r) => (
               <li key={r}>
-                <span className="mono">{r}</span>: {ruleText(r)}
+                <span className="mono rule-id">{r}</span>
+                <span>{ruleText(r)}</span>
               </li>
             ))}
           </ul>
@@ -30,10 +31,13 @@ export function HandoffCardView({ card }: { card: HandoffCard }) {
       {card.verifiedFacts.length > 0 && (
         <div className="card-section">
           <h4>Hechos verificados</h4>
-          <ul>
+          <ul className="facts">
             {card.verifiedFacts.map((f) => (
               <li key={`${f.kind}-${f.id}`}>
-                <span className="mono">{f.id}</span> ({f.kind}): {f.detail}
+                <span className="mono">{f.id}</span>
+                <span>
+                  ({f.kind}): {f.detail}
+                </span>
               </li>
             ))}
           </ul>

@@ -72,6 +72,7 @@ describe("webHandler", () => {
     const page = serve("/trace/abc")!;
     expect(await page.text()).toContain("<title>AIDO</title>");
     expect(page.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(page.headers.get("content-security-policy")).toContain("font-src 'self' data:");
     expect(page.headers.get("x-content-type-options")).toBe("nosniff");
     expect(serve("/api/anything")).toBeNull();
     expect(serve("/api")).toBeNull();

@@ -32,14 +32,115 @@ export function Logo({ size = 32 }: { size?: number }) {
   );
 }
 
-/** Lowercase wordmark; the dot of the "i" is the brand's gold spark. */
-export function Wordmark({ size = 28 }: { size?: number }) {
+/** Lowercase wordmark; the dot of the "i" is the brand's gold spark. `light` reads white, for dark emerald surfaces. */
+export function Wordmark({ size = 28, sub, light = false }: { size?: number; sub?: string; light?: boolean }) {
   return (
-    <span className="wordmark">
+    <span className={`wordmark${light ? " light" : ""}`}>
       <Logo size={size} />
-      <span className="wordmark-name" style={{ fontSize: Math.round(size * 0.62) }}>
-        a<span className="wm-i">ı<span className="wm-dot" /></span>do
+      <span className="wordmark-text">
+        <span className="wordmark-name" style={{ fontSize: Math.round(size * 0.62) }}>
+          a<span className="wm-i">ı<span className="wm-dot" /></span>do
+        </span>
+        {sub && <span className="wordmark-sub">{sub}</span>}
       </span>
     </span>
+  );
+}
+
+/** Small round avatar next to a chat bubble: the AIDO mark for the assistant, a person glyph for a human agent. */
+export function Avatar({ who }: { who: "assistant" | "agent" }) {
+  return who === "assistant" ? (
+    <span className="avatar assistant" aria-hidden="true">
+      <Logo size={32} />
+    </span>
+  ) : (
+    <span className="avatar agent" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <circle cx="12" cy="8" r="4" fill="currentColor" />
+        <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
+// ── decorative security-print patterns ───────────────────────────────────────────────────────────────────────
+
+/** Hypotrochoid curve, the basis of banknote guilloché. */
+function hypotrochoid(R: number, r: number, d: number, cx: number, cy: number, turns: number, steps = Math.max(900, turns * 260)): string {
+  const pts: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2 * turns;
+    const x = cx + (R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t);
+    const y = cy + (R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t);
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return `M${pts.join("L")}`;
+}
+
+const ROSETTE = [
+  hypotrochoid(150, 52, 70, 200, 200, 13),
+  hypotrochoid(150, 37.5, 80, 200, 200, 3),
+  hypotrochoid(120, 45, 60, 200, 200, 3),
+  hypotrochoid(170, 34, 40, 200, 200, 1),
+];
+
+/** Banknote-style rosette. Purely decorative; color comes from `currentColor`. */
+export function Guilloche({ className = "", opacity = 0.35 }: { className?: string; opacity?: number }) {
+  return (
+    <svg className={`guilloche ${className}`} viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="0.6" opacity={opacity}>
+        {ROSETTE.map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+const WAVES = Array.from({ length: 22 }, (_, i) => {
+  const y = 10 + i * 9;
+  let d = `M0 ${y}`;
+  for (let x = 0; x <= 400; x += 10) d += ` L${x} ${(y + Math.sin(x / 34 + i * 0.55) * 6).toFixed(1)}`;
+  return d;
+});
+
+/** Fine wave lines, as on the edges of a cheque. */
+export function Waves({ className = "", opacity = 0.25 }: { className?: string; opacity?: number }) {
+  return (
+    <svg className={`waves ${className}`} viewBox="0 0 400 210" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="0.7" opacity={opacity}>
+        {WAVES.map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/** The AIDO card, for the login hero. Shows only the masked number — never a real one. */
+export function BankCard({ masked = "•••• 2370", label = "Crédito", holder }: { masked?: string; label?: string; holder?: string }) {
+  const last4 = masked.replace(/\D/g, "").slice(-4) || "0000";
+  return (
+    <div className="bank-card" role="img" aria-label={`Tarjeta AIDO ${label} terminada en ${last4}`}>
+      <Guilloche className="bank-card-rosette" opacity={0.5} />
+      <div className="bank-card-top">
+        <Wordmark size={28} light />
+        <span className="bank-card-label">{label}</span>
+      </div>
+      <div className="bank-card-chip" aria-hidden="true">
+        <span />
+        <svg viewBox="0 0 24 24" width="22" height="22" className="contactless">
+          <path d="M8 7c2 2.8 2 7.2 0 10M12 5c3 4 3 10 0 14M16 3c4 5.4 4 12.6 0 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </div>
+      <div className="bank-card-number">•••• •••• •••• {last4}</div>
+      <div className="bank-card-bottom">
+        <span>{holder ?? "CLIENTE AIDO"}</span>
+        <span className="bank-card-net" aria-hidden="true">
+          <i />
+          <i />
+        </span>
+      </div>
+    </div>
   );
 }

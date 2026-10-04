@@ -1,5 +1,6 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
+import { BankCard, Guilloche, Logo, Waves, Wordmark } from "../Brand";
 import { ApiError } from "../lib/api";
 import { type Lang, PERSONAS, T, personaText } from "../lib/i18n";
 import { loginRoute } from "../router";
@@ -54,45 +55,90 @@ export function LoginPage() {
   }
 
   return (
-    <section className="login">
-      <h1>{t.loginTitle}</h1>
-      <p className="muted">{t.loginLead}</p>
-      {expired && <p className="notice warn">{t.sessionExpired}</p>}
-      <form onSubmit={submit} className="login-form">
-        <fieldset className="personas">
-          <legend>{t.persona}</legend>
-          {personas.map((p) => {
-            const info = personaText(p, lang);
-            return (
-              <label key={p} className={`persona${persona === p ? " selected" : ""}`}>
-                <input type="radio" name="persona" value={p} checked={persona === p} onChange={() => setPersona(p)} />
-                <span className="persona-name">{info.name}</span>
-                <span className="persona-hint">{info.hint}</span>
-              </label>
-            );
-          })}
-        </fieldset>
-        <div className="row">
-          <fieldset className="segmented">
-            <legend>{t.language}</legend>
-            {(["es", "pt"] as const).map((l) => (
-              <label key={l} className={lang === l ? "selected" : ""}>
-                <input type="radio" name="lang" value={l} checked={lang === l} onChange={() => setLang(l)} />
-                {l === "es" ? "Español" : "Português"}
-              </label>
-            ))}
+    <main className="auth">
+      <section className="auth-hero">
+        <Guilloche className="hero-rosette" opacity={0.24} />
+        <Waves className="hero-waves" opacity={0.18} />
+        <Wordmark size={40} sub={t.brandTagline} light />
+        <div className="hero-main">
+          <div className="hero-copy">
+            <h1>{t.loginTitle}</h1>
+            <p>{t.loginSubtitle}</p>
+            <ul className="hero-points">
+              {t.heroPoints.map((point) => (
+                <li key={point}>
+                  <span className="hero-check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="hero-stage" aria-hidden="true">
+            <BankCard holder="CLIENTE AIDO" />
+            <div className="hero-chat">
+              <div className="preview-bubble user">{t.heroPreviewQuestion}</div>
+              <div className="preview-bubble assistant">
+                <Logo size={22} />
+                <span>{t.heroPreviewAnswer}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="hero-foot">{t.demoNote}</p>
+      </section>
+
+      <section className="auth-panel">
+        <form onSubmit={submit} className="auth-form card">
+          <div className="auth-head">
+            <h2>{t.enter}</h2>
+            <fieldset className="segmented">
+              <legend>{t.language}</legend>
+              {(["es", "pt"] as const).map((l) => (
+                <label key={l} className={lang === l ? "selected" : ""}>
+                  <input type="radio" name="lang" value={l} checked={lang === l} onChange={() => setLang(l)} />
+                  {l === "es" ? "Español" : "Português"}
+                </label>
+              ))}
+            </fieldset>
+          </div>
+
+          {expired && <p className="notice warn">{t.sessionExpired}</p>}
+
+          <fieldset className="personas">
+            <legend>{t.persona}</legend>
+            {personas.map((p) => {
+              const info = personaText(p, lang);
+              return (
+                <label key={p} className={`persona${persona === p ? " selected" : ""}`}>
+                  <input type="radio" name="persona" value={p} checked={persona === p} onChange={() => setPersona(p)} />
+                  <span className="persona-name">{info.name}</span>
+                  <span className="persona-hint">{info.hint}</span>
+                </label>
+              );
+            })}
           </fieldset>
+
           <label className="field">
             <span>{t.pin}</span>
             <input inputMode="numeric" autoComplete="off" maxLength={12} value={pin} onChange={(e) => setPin(e.target.value)} required />
             <small className="muted">{t.pinHint}</small>
           </label>
-        </div>
-        {error && <p className="notice error">{error}</p>}
-        <button type="submit" className="primary" disabled={busy || pin.length === 0}>
-          {t.enter}
-        </button>
-      </form>
-    </section>
+
+          {error && <p className="notice error">{error}</p>}
+
+          <button type="submit" className="primary big" disabled={busy || pin.length === 0}>
+            {t.enter}
+          </button>
+
+          <div className="auth-foot">
+            <Link to="/agent">{t.agentConsole} →</Link>
+          </div>
+        </form>
+      </section>
+    </main>
   );
 }
