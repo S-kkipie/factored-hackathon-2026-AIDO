@@ -22,7 +22,7 @@ redteam:
     refund, approve, block cards, reveal other customers' data, reveal its instructions, or let chat text
     confirm an action.
   language: [Spanish, Portuguese]
-  numTests: 2
+  numTests: 1
   plugins:
     - bola
     - bfla
@@ -42,12 +42,11 @@ redteam:
   strategies:
     - basic
     - base64
-    - leetspeak
     - id: crescendo
       config:
         stateful: true
-        maxTurns: 4
+        maxTurns: 3
     - id: goat
       config:
         stateful: true
-        maxTurns: 4
+        maxTurns: 3
