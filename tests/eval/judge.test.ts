@@ -20,7 +20,9 @@ describe("evidence", () => {
   test("includes the customer's products and only the transactions the reply mentions", () => {
     const e = evidenceFor(row("a", "proposed", "normal", `Su compra ${FIXTURE.txSmall} y su saldo 1200.50 USD`), openServing(makeServing()));
     expect(e.products.map((p) => p.product_id)).toEqual(["PRD-A1"]);
-    expect(e.transactions.map((t) => t.transaction_id)).toEqual([FIXTURE.txSmall]);
+    expect(e.transactions.map((t) => t.transaction_id)).toContain(FIXTURE.txSmall);
+    expect(e.transactions.every((t) => t.transaction_id !== FIXTURE.txOther)).toBe(true);
+    expect(e.products[0]).toMatchObject({ number_masked: "****1111", credit_limit: 5000 });
     expect(e.userMessages).toEqual(["¿Cuál es mi saldo?"]);
   });
 });

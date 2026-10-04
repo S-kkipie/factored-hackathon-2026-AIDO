@@ -32,7 +32,14 @@ const pct = (n: number, d: number) => {
   return r.rate === null ? "n/a" : `${(r.rate * 100).toFixed(1)}% (${((r.lo ?? 0) * 100).toFixed(1)}–${((r.hi ?? 0) * 100).toFixed(1)}) · ${n}/${d}`;
 };
 
-export function renderJudgeReport(o: { runId: string; items: JudgeItem[]; verdicts: Record<string, Verdict | null>; labels: Record<string, Label> }): string {
+/** A reference rater the judge is validated against (human, a second AI rater, or deterministic checks). */
+export interface Reference {
+  name: string;
+  description: string;
+  labels: Record<string, Label>;
+}
+
+export function renderJudgeReport(o: { runId: string; items: JudgeItem[]; verdicts: Record<string, Verdict | null>; references: Reference[]; notes?: string[] }): string {
   const judged = o.items.filter((i) => o.verdicts[i.key]);
   const crit = ["grounded", "language", "tone", "pass"] as const;
   const lines = [
@@ -49,20 +56,28 @@ export function renderJudgeReport(o: { runId: string; items: JudgeItem[]; verdic
     const vs = judged.filter((i) => i.system === system).map((i) => o.verdicts[i.key]!);
     lines.push(`| ${system} | ${crit.map((c) => pct(vs.filter((v) => v[c]).length, vs.length)).join(" | ")} |`);
   }
-  const labeled = o.items.filter((i) => o.labels[i.key] && o.verdicts[i.key]);
-  lines.push("", "## Agreement with human labels", "", `${labeled.length} items labeled by a team member, blind to the judge and to which system answered.`, "", "| Criterion | n | agreement | Cohen's κ | TPR | TNR |", "|---|---|---|---|---|---|");
-  for (const c of crit) {
-    const a = agreement(labeled.map((i) => [o.labels[i.key]![c], o.verdicts[i.key]![c]] as [boolean, boolean]));
-    lines.push(`| ${c} | ${a.n} | ${a.n ? ((a.agree / a.n) * 100).toFixed(1) : "n/a"}% | ${f(a.kappa)} | ${f(a.tpr)} | ${f(a.tnr)} |`);
+  const passKappas: string[] = [];
+  for (const ref of o.references) {
+    const labeled = o.items.filter((i) => ref.labels[i.key] && o.verdicts[i.key]);
+    if (labeled.length === 0) continue;
+    lines.push("", `## Agreement with ${ref.name}`, "", ref.description, "", "| Criterion | n | agreement | Cohen's κ | TPR | TNR |", "|---|---|---|---|---|---|");
+    for (const c of crit) {
+      const a = agreement(labeled.map((i) => [ref.labels[i.key]![c], o.verdicts[i.key]![c]] as [boolean, boolean]));
+      lines.push(`| ${c} | ${a.n} | ${a.n ? ((a.agree / a.n) * 100).toFixed(1) : "n/a"}% | ${f(a.kappa)} | ${f(a.tpr)} | ${f(a.tnr)} |`);
+    }
+    const k = agreement(labeled.map((i) => [ref.labels[i.key]!.pass, o.verdicts[i.key]!.pass] as [boolean, boolean])).kappa;
+    passKappas.push(`${ref.name}: ${f(k)}`);
   }
-  const k = agreement(labeled.map((i) => [o.labels[i.key]!.pass, o.verdicts[i.key]!.pass] as [boolean, boolean])).kappa;
   lines.push(
     "",
-    k !== null && k >= 0.6
-      ? `The overall-pass κ is ${k.toFixed(2)} ≥ 0.6: the judge is usable as a secondary quality signal.`
-      : `The overall-pass κ is ${f(k)} (< 0.6 or undefined): the judge is NOT validated; treat its rates as indicative only.`,
+    "## Reading",
     "",
-    "Limitations: one human labeler; 50 labels; the security grader (promptfoo) is not human-validated (see reports/redteam.md).",
+    `Overall-pass Cohen's κ by reference: ${passKappas.join("; ") || "none"}. κ ≥ 0.6 is the bar for using the judge as a secondary quality signal.`,
+    "TPR/TNR take the reference as truth (positive = pass).",
+    "",
+    ...(o.notes ?? []).map((n) => `- ${n}`),
+    "",
+    "Limitations: the security grader (promptfoo) is not human-validated (see reports/redteam.md).",
     "",
   );
   return lines.join("\n");

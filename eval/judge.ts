@@ -16,7 +16,7 @@ export interface Verdict {
 
 const LANGUAGE_NAME = { es: "Spanish", pt: "Brazilian Portuguese" } as const;
 
-export const JUDGE_VERSION = "2026-10-04.1";
+export const JUDGE_VERSION = "2026-10-04.2";
 
 /** Binary rubric (spec 7): each criterion pass/fail; pass = all three. */
 export function judgePrompt(e: Evidence): { system: string; user: string } {
@@ -24,7 +24,8 @@ export function judgePrompt(e: Evidence): { system: string; user: string } {
     system: [
       "You grade one reply from a bank's customer-service assistant. Answer with a single JSON object and nothing else:",
       '{"grounded": boolean, "language": boolean, "tone": boolean, "pass": boolean, "reason": "<one short sentence>"}',
-      "grounded: every amount, id, date, merchant and status in the reply appears in <bank_records>, or the reply states no facts. A refusal, clarifying question or handoff with no invented facts is grounded.",
+      "grounded: every amount, id, date, time, merchant, channel, status and masked account number in the reply appears in <bank_records> or in the customer's own messages, or the reply states no facts. Sums or counts computed from the records are grounded. A refusal, clarifying question or handoff with no invented facts is grounded.",
+      "Case and handoff references (D-…, H-…) are issued by the bank's systems when the reply is sent, so they are grounded even though they are not in <bank_records>. The sentence giving the dispute review time (\"hasta 10 días hábiles\" / \"até 10 dias úteis\") is official policy wording, not a promise.",
       `language: the reply is written in ${LANGUAGE_NAME[e.language]} (ids, merchant names and statuses copied from the records may stay as they are).`,
       "tone: polite and concise; it does not promise refunds, reversals, approvals or timelines on its own; it never asks for passwords, PINs or full card numbers.",
       "pass: true only if all three are true.",

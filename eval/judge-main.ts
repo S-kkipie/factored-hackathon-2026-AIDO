@@ -7,7 +7,8 @@ import { openServing } from "../server/db/serving";
 import { createGeminiLlm } from "../server/llm/gemini";
 import { SpendLedger } from "../server/llm/ledger";
 import { RunBudget, SpendCapError, meteredLlm } from "../server/llm/metered";
-import { renderJudgeReport } from "./agreement";
+import { type Reference, renderJudgeReport } from "./agreement";
+import { deterministicLabel } from "./deterministic-judge";
 import { type JudgeItem, type Verdict, judge, judgeSet, labelSample } from "./judge";
 import type { Label } from "./label";
 import type { EvalResult } from "./main";
@@ -52,10 +53,43 @@ if (import.meta.main) {
     const { runId, items } = JSON.parse(readFileSync(join(DIR, "items.json"), "utf8")) as { runId: string; items: JudgeItem[] };
     const verdictsPath = join(DIR, "verdicts.json");
     const verdicts = (existsSync(verdictsPath) ? JSON.parse(readFileSync(verdictsPath, "utf8")) : {}) as Record<string, Verdict | null>;
-    const labelsPath = join(DIR, "labels.json");
-    const labels = (existsSync(labelsPath) ? JSON.parse(readFileSync(labelsPath, "utf8")) : {}) as Record<string, Label>;
+    const read = (name: string) =>
+      (existsSync(join(DIR, name)) ? JSON.parse(readFileSync(join(DIR, name), "utf8")) : {}) as Record<string, Label>;
+    // Deterministic reference over every judged item: the customer comes from the run the items were drawn from.
+    const run = JSON.parse(readFileSync(join(ROOT, `data/eval/runs/${runId}.json`), "utf8")) as EvalResult;
+    const customerOf = new Map(Object.values(run.systems).flat().map((r) => [r!.s.id, r!.s.customerId]));
+    const serving = openServing(join(ROOT, "data/serving.sqlite"));
+    const deterministic = Object.fromEntries(items.map((i) => [i.key, deterministicLabel(i, customerOf.get(i.scenarioId)!, serving)]));
+    const references: Reference[] = [
+      {
+        name: "deterministic checks",
+        description: `Every judged item (the judge covered ${Object.values(verdicts).filter(Boolean).length} of ${items.length} before its spend limit), labeled by the system's own response gate with the customer's full records: grounded = no unsupported amount or unknown id; language = detected language matches the session; tone = no improvised commitment outside policy templates and no credential request (eval/deterministic-judge.ts). The problem statement allows validating a judge "against human or deterministic judgments".`,
+        labels: deterministic,
+      },
+      {
+        name: "a second AI rater (not human)",
+        description: "The 50-item blind sample labeled by Claude (Anthropic), the coding assistant, against the same rubric and evidence, without seeing the judge's verdicts or which system answered. This is model-to-model agreement and is NOT a human validation.",
+        labels: read("labels-ai.json"),
+      },
+      {
+        name: "human labels",
+        description: "The 50-item blind sample labeled by a team member, without seeing the judge's verdicts or which system answered.",
+        labels: read("labels.json"),
+      },
+    ];
     mkdirSync(join(ROOT, "reports"), { recursive: true });
-    writeFileSync(join(ROOT, "reports/judge.md"), renderJudgeReport({ runId, items, verdicts, labels }));
+    writeFileSync(join(ROOT, "reports/judge.md"), renderJudgeReport({
+        runId,
+        items,
+        verdicts,
+        references,
+        notes: [
+          "Prevalence: almost every reply passes, so Cohen's κ is unstable (the kappa paradox): against the deterministic checks the judge agrees on 90.8% of items yet κ is low because the few negatives differ.",
+          "Where they differ: the deterministic gate checks only amounts, ids, language and commitment wording; it flags ids the customer typed and translated statuses (\"Aprobada\", \"Aprovada\") that the judge accepts, and it cannot see invented non-numeric facts (branch hours, a merchant category) that the judge rejects.",
+          "Evidence revision: a first judge pass (judge v2026-10-04.1) gave the judge only the transactions cited by id and no masked numbers, limits, times or channels; it marked 47% of proposed replies ungrounded for facts that were in the database. The evidence and rubric were corrected (v2026-10-04.2) before the results above; the first pass is kept in data/ and not reported as the result.",
+          "Budget: the second pass stopped at its spend limit after 119 of 150 items (100 proposed, 19 baseline); 33 of the 50 sampled items were judged.",
+        ],
+      }));
     console.log("report → reports/judge.md");
   }
 }
