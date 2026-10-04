@@ -269,7 +269,7 @@ Pipeline outputs:
 | 4 | Web UI: chat, agent console, trace viewer | done |
 | 5a | Evaluation harness: 200 ES/PT scenarios, deterministic grading, naive baseline | done |
 | 5b | LLM judge (validated against deterministic checks and a blind second rater), ES/PT attack corpus, promptfoo red teaming | done |
-| 6 | Deployment and operations on GCP | planned |
+| 6 | Deployment and operations on GCP | deploy-ready (deploy pending: performed from the team's GCP environment) |
 
 ## Known limitations
 
@@ -279,6 +279,17 @@ Pipeline outputs:
 - There is no Portuguese source data. Portuguese coverage comes from team-generated, labeled examples.
 - Evaluation samples are small. Zero observed failures does not mean zero risk.
 - Writable state lives in container-local SQLite, so the service runs as a single Cloud Run instance. The production path is Postgres / Cloud SQL.
+
+## Deploy
+
+Deploying to Cloud Run is a one-service, dry-run-by-default script; see the full
+runbook at [`docs/deploy.md`](docs/deploy.md) for prerequisites, one-time GCP setup
+(Artifact Registry, Secret Manager, Model Armor), verification and rollback. To see
+the commands it would run without executing anything:
+
+```bash
+bun run deploy -- --project P --region R --langfuse --model-armor-template aido-pi
+```
 
 ## Documentation
 

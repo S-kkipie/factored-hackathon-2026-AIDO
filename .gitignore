@@ -13,6 +13,7 @@ docs/*
 !docs/research/
 !docs/screenshots/
 !docs/architecture.html
+!docs/deploy.md
 .playwright-mcp/
 .superpowers/
 reports/eval-dev.md

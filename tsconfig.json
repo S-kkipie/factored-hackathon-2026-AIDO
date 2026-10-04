@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["pipeline", "server", "ml", "eval", "tests"]
+  "include": ["pipeline", "server", "ml", "eval", "deploy", "tests"]
 }
