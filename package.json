@@ -15,7 +15,11 @@
     "ml:generate": "bun ml/generate.ts",
     "train": "bun ml/train.ts",
     "eval:build": "bun eval/build.ts",
-    "eval": "bun eval/main.ts"
+    "eval": "bun eval/main.ts",
+    "eval:judge": "bun eval/judge-main.ts",
+    "eval:label": "bun eval/label.ts",
+    "redteam": "mkdir -p redteam/output && PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_SHARING=1 npx --yes promptfoo@0.123.1 redteam run -c redteam/promptfooconfig.yaml -o redteam/redteam.yaml -j 4 --remote && PROMPTFOO_DISABLE_TELEMETRY=1 npx --yes promptfoo@0.123.1 export eval latest -o redteam/output/results.json",
+    "redteam:report": "bun eval/redteam/report.ts"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.1",

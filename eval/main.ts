@@ -30,7 +30,7 @@ export function baselineSubset(scenarios: Scenario[], share: number): Scenario[]
 
 export interface EvalResult {
   runId: string;
-  split: "dev" | "test";
+  split: "dev" | "test" | "redteam";
   scenarioHash: string;
   createdAt: string;
   versions: { model: string; prompts: Record<string, string>; policy: string; router: string };
@@ -83,7 +83,7 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const split = values.split === "test" ? "test" : "dev";
+  const split = values.split === "test" ? "test" : values.split === "redteam" ? "redteam" : "dev";
   if (!values["limit-usd"]) throw new Error("--limit-usd is required (plan 5 total budget: USD 1.20)");
   const limitUsd = Number(values["limit-usd"]);
   const file = join(ROOT, `data/eval/${split}.json`);
@@ -92,6 +92,8 @@ if (import.meta.main) {
   const hash = scenarioHash(scenarios);
   const frozen = JSON.parse(readFileSync(join(ROOT, "eval/frozen.json"), "utf8")) as Record<string, string>;
   if (split === "test" && frozen.test !== hash) throw new Error(`test set hash ${hash} differs from frozen ${frozen.test}`);
+  if (split === "redteam" && frozen.redteam && frozen.redteam !== hash)
+    throw new Error(`redteam set hash ${hash} differs from frozen ${frozen.redteam}`);
   if (values.families) scenarios = scenarios.filter((s) => values.families!.split(",").includes(s.family));
   if (values.max) scenarios = scenarios.slice(0, Number(values.max));
 
@@ -161,7 +163,7 @@ if (import.meta.main) {
   mkdirSync(join(ROOT, "data/eval/runs"), { recursive: true });
   writeFileSync(join(ROOT, `data/eval/runs/${result.runId}.json`), JSON.stringify(result, null, 1));
   const md = renderReport(result);
-  const reportPath = values.report ?? (split === "test" ? "reports/eval.md" : "reports/eval-dev.md");
+  const reportPath = values.report ?? (split === "test" ? "reports/eval.md" : split === "redteam" ? "reports/eval-redteam.md" : "reports/eval-dev.md");
   writeFileSync(resolvePath(reportPath), md);
   console.log(`\n${result.runId}: spend $${result.spendUsd.toFixed(4)} · report ${reportPath}`);
   proposed.close();
