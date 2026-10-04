@@ -34,14 +34,16 @@ export function toOtlpJson(spans: SpanRecord[], service: string, environment: st
                 spanId: s.span_id,
                 ...(s.parent_id ? { parentSpanId: s.parent_id } : {}),
                 name: s.name,
-                kind: 1,
+                // OTLP SpanKind: CLIENT (3) for model calls, INTERNAL (1) for graph nodes and gates.
+                kind: s.name.startsWith("chat ") ? 3 : 1,
                 startTimeUnixNano: nanos(start),
                 endTimeUnixNano: nanos(start + s.duration_ms),
                 attributes: Object.entries(attrs).flatMap(([key, v]) => {
                   const val = value(v as AttrValue);
                   return val ? [{ key, value: val }] : [];
                 }),
-                status: { code: s.attributes["error.type"] ? 2 : 1 },
+                // OTLP StatusCode: ERROR (2) when the span recorded an error, otherwise UNSET (0).
+                status: { code: s.attributes["error.type"] ? 2 : 0 },
               };
             }),
           },
