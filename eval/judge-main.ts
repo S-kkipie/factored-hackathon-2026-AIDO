@@ -7,14 +7,16 @@ import { openServing } from "../server/db/serving";
 import { createGeminiLlm } from "../server/llm/gemini";
 import { SpendLedger } from "../server/llm/ledger";
 import { RunBudget, SpendCapError, meteredLlm } from "../server/llm/metered";
+import { renderJudgeReport } from "./agreement";
 import { type JudgeItem, type Verdict, judge, judgeSet, labelSample } from "./judge";
+import type { Label } from "./label";
 import type { EvalResult } from "./main";
 
 const DIR = join(ROOT, "data/eval/judge");
 
 if (import.meta.main) {
   const { values } = parseArgs({
-    options: { run: { type: "string" }, sample: { type: "boolean" }, judge: { type: "boolean" }, "limit-usd": { type: "string" } },
+    options: { run: { type: "string" }, sample: { type: "boolean" }, judge: { type: "boolean" }, "limit-usd": { type: "string" }, report: { type: "boolean" } },
   });
   mkdirSync(DIR, { recursive: true });
   if (values.sample) {
@@ -45,5 +47,15 @@ if (import.meta.main) {
       writeFileSync(path, JSON.stringify(verdicts, null, 1));
     }
     console.log(`judged ${Object.values(verdicts).filter(Boolean).length}/${items.length} · spend $${budget.spent().toFixed(4)}`);
+  }
+  if (values.report) {
+    const { runId, items } = JSON.parse(readFileSync(join(DIR, "items.json"), "utf8")) as { runId: string; items: JudgeItem[] };
+    const verdictsPath = join(DIR, "verdicts.json");
+    const verdicts = (existsSync(verdictsPath) ? JSON.parse(readFileSync(verdictsPath, "utf8")) : {}) as Record<string, Verdict | null>;
+    const labelsPath = join(DIR, "labels.json");
+    const labels = (existsSync(labelsPath) ? JSON.parse(readFileSync(labelsPath, "utf8")) : {}) as Record<string, Label>;
+    mkdirSync(join(ROOT, "reports"), { recursive: true });
+    writeFileSync(join(ROOT, "reports/judge.md"), renderJudgeReport({ runId, items, verdicts, labels }));
+    console.log("report → reports/judge.md");
   }
 }

@@ -16,7 +16,8 @@
     "train": "bun ml/train.ts",
     "eval:build": "bun eval/build.ts",
     "eval": "bun eval/main.ts",
-    "eval:judge": "bun eval/judge-main.ts"
+    "eval:judge": "bun eval/judge-main.ts",
+    "eval:label": "bun eval/label.ts"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.1",
