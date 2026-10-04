@@ -136,6 +136,7 @@ pipeline/   data contracts, incremental staging, curation, quality report (Bun +
 server/     auth, tools, policy engine, gates, LangGraph graph, API
 web/        React + Vite + TanStack Router app: login, chat, agent console, trace view
 ml/         intent-router dataset, training and experiments
+eval/       evaluation workload builder, runners (proposed + baseline), deterministic grading, report
 tests/      unit and end-to-end tests (bun test)
 reports/    generated data-quality, demand and evaluation reports
 docs/
