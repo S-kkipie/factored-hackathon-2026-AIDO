@@ -100,6 +100,7 @@ export interface ReportMeta {
   subset: string;
   scenarioHash: string;
   fake: boolean;
+  modelTimeoutMs: number;
 }
 
 export function renderReport(meta: ReportMeta, summaries: SystemSummary[]): string {
@@ -110,7 +111,7 @@ export function renderReport(meta: ReportMeta, summaries: SystemSummary[]): stri
   const lines = [
     "# Evaluation report",
     "",
-    `Run \`${meta.runId}\` · model \`${meta.model}\` · AIDO router \`${meta.router}\` · subset \`${meta.subset}\` · scenarios sha256 \`${meta.scenarioHash.slice(0, 16)}…\``,
+    `Run \`${meta.runId}\` · model \`${meta.model}\` · AIDO router \`${meta.router}\` · subset \`${meta.subset}\` · model timeout ${meta.modelTimeoutMs / 1000} s (both systems) · scenarios sha256 \`${meta.scenarioHash.slice(0, 16)}…\``,
     meta.fake
       ? "\n> **Offline smoke run with a scripted model.** These numbers check the harness, not the system. Do not report them.\n"
       : "",

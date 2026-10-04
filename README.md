@@ -73,9 +73,15 @@ flowchart LR
 
 Diagrams of the data flow, conversation graph, GCP deployment, LangGraph runtime and guardrail harness are in [`docs/architecture.html`](docs/architecture.html) (download and open it locally).
 
-## Evaluation plan
+## Evaluation
 
-The baseline and the proposed system replay the same frozen held-out workload: about 200 multi-turn scenarios, half Spanish and half Portuguese. The workload covers normal, ambiguous, out-of-scope and must-escalate cases, plus attacks and injected tool failures. The only architectural difference between the two is the policy gate.
+```bash
+bun run eval --fake            # offline harness check with a scripted model (no key, no cost; not reportable)
+bun run eval                   # dev subset (50 scenarios) × AIDO + naive baseline, real Gemini
+bun run eval --subset=full     # all 124 scenarios; --run-limit=<usd> caps this run's spend
+```
+
+The baseline and AIDO replay the same frozen workload (`eval/data/scenarios.json`, sha256-checked): 124 multi-turn scenarios, half Spanish and half Portuguese, in 25 families — normal, ambiguous, out of scope, must escalate, adversarial (direct and indirect injection, cross-customer access, prompt extraction, typed confirmation), injected tool failures and null amounts, Portuñol and regionalisms. Every run gets its own PGlite clone of the demo data. The naive baseline is Gemini function calling over the same tools without the policy layer, out-of-band confirmation or gates. Results: [`reports/eval.md`](reports/eval.md); raw runs in `eval/runs/`.
 
 - **Pass/fail is deterministic:** outcome class, rule ids in the trace, whether the dispute exists in the database, and a cross-customer data leak scan. An LLM judge scores only response quality, and is validated against human labels (Cohen's κ ≥ 0.6).
 - **Red teaming uses [promptfoo](https://www.promptfoo.dev/):** OWASP LLM and Agentic plugins in ES/PT, multi-turn strategies (Crescendo, GOAT, Hydra), and indirect injection through data fields.
@@ -168,12 +174,17 @@ bun run web:dev        # http://localhost:5173 (proxies /api to :8080; run `bun 
 bun run web:build      # web/dist, served by the API server at / (single container)
 ```
 
-| Page | Purpose |
-|---|---|
-| `/login` | Pick a demo persona (each one demonstrates a policy path) and ES/PT |
-| `/chat` | Streaming AG-UI chat with a live status line (step, router confidence, decision, rule ids); disputes are confirmed only with the nonce-bearing button; agent replies appear after a handoff |
-| `/agent` | Handoff queue, structured case card, take / reply / resolve |
-| `/trace/:session` | Per-turn span timeline with rule ids, decisions, latency, tokens and cost |
+AIDO brand (emerald and gold, light and dark), desktop-first.
+
+| Page | Who | Purpose |
+|---|---|---|
+| `/login` | customer | Pick a demo persona (each one demonstrates a policy path) and ES/PT |
+| `/inicio` | customer | Accounts, 30-day spending by category, monthly trend, recent movements, quick actions |
+| `/chat` | customer | Aida, the assistant: streaming AG-UI chat with rich cards (accounts, movements, confirmation, dispute, handoff); disputes are confirmed only with the nonce-bearing button; agent replies appear after a handoff |
+| `/casos` | customer | The customer's disputes and handoffs with a status tracker |
+| `/agent` | agent | Handoff queue triaged by rule priority, filters, new-case alerts, case card with plain-language rules, messenger-style replies |
+| `/supervision` | agent | Live KPIs: automated resolution, latency p50/p95, AI cost, outcomes per turn, escalations by rule, intents, security signals, hourly volume |
+| `/trace/:session` | agent / own session | Per-turn span timeline with rule ids, decisions, latency, tokens and cost |
 
 | Route | Purpose |
 |---|---|
@@ -187,6 +198,8 @@ bun run web:build      # web/dist, served by the API server at / (single contain
 | `GET /api/agent/queue`, `POST /api/agent/sessions/:id/{take,reply,resume}` | Agent console |
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
+| `GET /api/me/overview`, `GET /api/me/cases` | Customer home and own cases (session customer only, projected fields) |
+| `GET /api/ops/metrics?hours=` | Supervision aggregates (agent only; no message text) |
 
 Optional env: `DATABASE_URL`, `PGLITE_DIR`, `ROUTER` (`auto` default, `keyword`, `embed-lr`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH` (for `publish`), `LLM_TOTAL_CAP_USD` (default `3`: hard cap on total project LLM spend; calls that could cross it are refused with `BUD_TOTAL` and the turn falls back to templates or a handoff).
 
@@ -223,7 +236,7 @@ Serving contract (`serving.sqlite` and the Postgres `serving` schema read by the
 | 2c | Postgres / Supabase for runtime state and serving data | done |
 | 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
 | 4 | Web UI: chat, agent console, trace viewer | done |
-| 5 | Evaluation harness and red teaming | planned |
+| 5 | Evaluation harness and baseline (promptfoo red teaming and LLM judge pending) | done |
 | 6 | Deployment and operations on GCP | planned |
 
 ## Known limitations

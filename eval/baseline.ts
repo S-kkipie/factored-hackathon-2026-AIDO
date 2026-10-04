@@ -72,7 +72,7 @@ const SYSTEM = (lang: string, today: string) =>
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function geminiToolModel(apiKey: string, model: string): ToolModel {
+export function geminiToolModel(apiKey: string, model: string, timeoutMs = 30_000): ToolModel {
   const ai = new GoogleGenAI({ apiKey });
   const safetySettings = [
     HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -96,7 +96,7 @@ export function geminiToolModel(apiKey: string, model: string): ToolModel {
               tools: [{ functionDeclarations: DECLARATIONS }],
               thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
               safetySettings,
-              abortSignal: AbortSignal.timeout(30_000),
+              abortSignal: AbortSignal.timeout(timeoutMs),
             },
           });
           const raw = res.candidates?.[0]?.content ?? { role: "model", parts: [] };
@@ -110,7 +110,7 @@ export function geminiToolModel(apiKey: string, model: string): ToolModel {
           };
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          if (attempt >= 4 || !/503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(msg)) throw e;
+          if (attempt >= 4 || !/503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|aborted|timed? ?out/i.test(msg)) throw e;
           await sleep(2000 * 2 ** attempt);
         }
       }

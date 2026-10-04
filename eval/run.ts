@@ -78,19 +78,23 @@ async function main() {
   const env: Record<string, string | undefined> = {
     ...process.env,
     JWT_SECRET: process.env.JWT_SECRET ?? "eval-secret-eval-secret-eval-secret-0000",
+    // Both systems get the same provider timeout; the evaluation measures the system, not a slow provider day.
+    MODEL_TIMEOUT_MS: process.env.EVAL_MODEL_TIMEOUT_MS ?? "45000",
     ...(fake ? { GEMINI_API_KEY: "", ROUTER: "keyword" } : {}),
   };
   const cfg = loadServerConfig(env);
   if (!fake && !cfg.geminiApiKey) throw new Error("GEMINI_API_KEY is required (or use --fake for an offline harness check)");
   const ledger = new SpendLedger(cfg.spendLedgerPath, cfg.llmTotalCapUsd);
   const spentAtStart = await ledger.total();
-  const toolModel = fake ? null : geminiToolModel(cfg.geminiApiKey!, cfg.geminiModel);
+  const toolModel = fake ? null : geminiToolModel(cfg.geminiApiKey!, cfg.geminiModel, cfg.modelTimeoutMs);
   const runId = `${fake ? "fake" : "eval"}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
   console.log(`${runId} · ${scenarios.length} scenarios × ${systems.join("+")} · model ${fake ? "fake-eval" : cfg.geminiModel} · run limit $${runLimit}`);
 
   const results: ScenarioResult[] = [];
   const grades: Grade[] = [];
   let stopped = false;
+  let abortReason: string | null = null;
+  let consecutiveExcluded = 0;
 
   for (const s of scenarios) {
     for (const system of systems) {
@@ -112,8 +116,20 @@ async function main() {
       results.push(result!);
       if (result!.infraError) {
         console.log(`  ✗ ${s.id.padEnd(30)} ${system.padEnd(8)} excluded (${result!.infraError})`);
+        consecutiveExcluded++;
+        // A quota error or a run of outages means every remaining scenario would be excluded too: stop and say why.
+        if (/quota|RESOURCE_EXHAUSTED|BUD_TOTAL/i.test(result!.infraError) || consecutiveExcluded >= 4) {
+          abortReason = /quota|RESOURCE_EXHAUSTED/i.test(result!.infraError)
+            ? "provider quota exhausted (free-tier daily limit?)"
+            : /BUD_TOTAL/.test(result!.infraError)
+              ? "project LLM spend cap reached"
+              : `${consecutiveExcluded} consecutive provider errors`;
+          stopped = true;
+          break;
+        }
         continue;
       }
+      consecutiveExcluded = 0;
       const probe = await scenarioDb(s);
       const own = await ownTransactionIds(probe.sql, await customerOf(probe.sql, s.persona));
       await probe.close();
@@ -129,12 +145,21 @@ async function main() {
   await closeTemplate();
 
   const summaries = systems.map((sys) => summarize(sys, scenarios, results, grades));
-  const meta = { runId, model: fake ? "fake-eval" : cfg.geminiModel, router: fake ? "keyword" : cfg.router, subset: `${subset}${only ? `:${only}` : ""}`, scenarioHash: hash, fake };
+  const meta = {
+    runId,
+    model: fake ? "fake-eval" : cfg.geminiModel,
+    router: fake ? "keyword" : cfg.router,
+    subset: `${subset}${only ? `:${only}` : ""}`,
+    scenarioHash: hash,
+    fake,
+    modelTimeoutMs: cfg.modelTimeoutMs,
+  };
   mkdirSync(join(ROOT, "eval", "runs"), { recursive: true });
-  writeFileSync(join(ROOT, "eval", "runs", `${runId}.json`), JSON.stringify({ meta, summaries, results, grades, stopped }, null, 2));
-  const reportPath = join(ROOT, "reports", fake ? "eval-fake.md" : "eval.md");
+  writeFileSync(join(ROOT, "eval", "runs", `${runId}.json`), JSON.stringify({ meta, summaries, results, grades, stopped, abortReason }, null, 2));
+  // An aborted run is kept in eval/runs/ but never overwrites the published report.
+  const reportPath = join(ROOT, "reports", fake ? "eval-fake.md" : abortReason ? `eval-partial.md` : "eval.md");
   writeFileSync(reportPath, renderReport(meta, summaries));
-  console.log(`\n${stopped ? "STOPPED at run limit · " : ""}spent $${((await ledger.total()) - spentAtStart).toFixed(4)} · ${reportPath}`);
+  console.log(`\n${abortReason ? `ABORTED: ${abortReason} · ` : stopped ? "STOPPED at run limit · " : ""}spent $${((await ledger.total()) - spentAtStart).toFixed(4)} · ${reportPath}`);
   for (const s of summaries) console.log(`${s.system}: pass ${s.pass.k}/${s.pass.n} · unsafe ${s.unsafe.k} · missed escalations ${s.missedEscalations.k}`);
 }
 
