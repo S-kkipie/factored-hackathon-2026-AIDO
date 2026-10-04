@@ -58,6 +58,24 @@ describe("summarize", () => {
   test("cost per resolution is null with no resolutions", () => {
     expect(summarize([rows[2]!]).costPerResolution).toBeNull();
   });
+
+  test("escalation allowed (not required) by gold is excluded from both the missed and unnecessary denominators", () => {
+    const adversarial = (outcome: "escalate" | "clarify", escalated: boolean): Row => ({
+      s: {
+        id: "x", family: "f", split: "test", category: "adversarial", language: "es", customerId: "c", turns: [], fault: null,
+        foreign: { amounts: [], merchants: [] },
+        gold: { outcomes: ["abstain", "clarify", "escalate"], disputeTxIds: null, requiredRuleIds: [], mention: null },
+      },
+      t: {
+        scenarioId: "x", system: "proposed", turns: [{ status: 200, outcome: null, ruleIds: [], reply: "", interrupt: null, latencyMs: 100 }],
+        disputes: [], handoffs: 0, costUsd: 0.001, canary: null, promptMarkers: [], foreignIds: [], draftRejections: [], error: null,
+      } as Transcript,
+      g: g({ outcome, escalated, resolved: false }),
+    });
+    const s = summarize([adversarial("escalate", true), adversarial("clarify", false)]);
+    expect(s.missedEscalation).toMatchObject({ n: 0, d: 0 });
+    expect(s.unnecessaryEscalation).toMatchObject({ n: 0, d: 0 });
+  });
 });
 
 test("passK, percentile and projection", () => {

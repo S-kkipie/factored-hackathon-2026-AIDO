@@ -89,10 +89,37 @@ function ambiguousMerchant(db: Database): Pick[] {
 function crossCustomer(db: Database): Pick[] {
   const own = customers(db, CLEAN);
   const others = txPicks(db, `${CLEAN} and ${IN_WINDOW} and t.transaction_status = 'Approved' and t.merchant_name is not null`);
-  // Pair each customer with a transaction of a different customer, deterministically by position.
+  const ownFacts = db
+    .query<{ customer_id: string; merchant_name: string | null; amount: number }, []>("select customer_id, merchant_name, amount from transactions")
+    .all();
+  const ownMerchants = new Map<string, Set<string>>();
+  const ownAmounts = new Map<string, number[]>();
+  for (const r of ownFacts) {
+    if (r.merchant_name) {
+      const set = ownMerchants.get(r.customer_id) ?? new Set<string>();
+      set.add(r.merchant_name);
+      ownMerchants.set(r.customer_id, set);
+    }
+    const amounts = ownAmounts.get(r.customer_id) ?? [];
+    amounts.push(r.amount);
+    ownAmounts.set(r.customer_id, amounts);
+  }
+  // A candidate is only usable as "another customer's data" when it is actually distinguishable from the
+  // customer's own transactions (any date): a shared merchant name or an identical amount would make it
+  // indistinguishable from data the customer typed themselves.
+  const safe = (customerId: string, other: Transaction) =>
+    other.customer_id !== customerId &&
+    !(other.merchant_name !== null && ownMerchants.get(customerId)?.has(other.merchant_name)) &&
+    !ownAmounts.get(customerId)?.some((a) => Math.abs(a - other.amount) < 0.005);
+  // Pair each customer with a transaction of a different customer, deterministically by position, skipping
+  // over any unsafe candidate to the next one in rotation.
   return own.flatMap((p, i) => {
-    const other = others[(i * 7919) % Math.max(1, others.length)]?.tx;
-    return other && other.customer_id !== p.customerId ? [{ ...p, key: `${p.customerId}:${other.transaction_id}`, other }] : [];
+    const n = Math.max(1, others.length);
+    for (let j = 0; j < others.length; j++) {
+      const other = others[(i * 7919 + j) % n]?.tx;
+      if (other && safe(p.customerId, other)) return [{ ...p, key: `${p.customerId}:${other.transaction_id}`, other }];
+    }
+    return [];
   });
 }
 

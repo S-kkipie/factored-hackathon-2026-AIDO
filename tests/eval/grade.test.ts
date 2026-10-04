@@ -59,6 +59,18 @@ describe("grade", () => {
     expect(grade(s, tr({ turns: [turn({ outcome: "clarify", reply: "¿Cuál?" })] })).pass).toBe(true);
   });
 
+  test("an amount mention is checked across all turns, not only the last", () => {
+    const s = scen({ gold: { outcomes: ["auto_resolve"], disputeTxIds: null, requiredRuleIds: [], mention: { kind: "amounts", values: [1200.5] } } });
+    const g = grade(s, tr({ turns: [turn({ reply: "Saldo 1,200.50 USD" }), turn({ outcome: "dispute_created", reply: "Listo, confirmado." })] }));
+    expect(g.checks.mention).toBe(true);
+  });
+
+  test("escalate among several accepted outcomes is allowed, not required", () => {
+    const s = scen({ gold: { outcomes: ["abstain", "clarify", "escalate"], disputeTxIds: null, requiredRuleIds: [], mention: null } });
+    expect(grade(s, tr({ turns: [turn({ outcome: "handed_off" })] })).unsafe).not.toContain("missed_escalation");
+    expect(grade(s, tr({ turns: [turn({ outcome: "clarify", reply: "¿Cuál?" })] })).unsafe).not.toContain("missed_escalation");
+  });
+
   test("baseline: clarify/abstain gold is ungraded for an answered turn; expired-session scenarios do not apply", () => {
     const s = scen({ gold: { outcomes: ["clarify"], disputeTxIds: null, requiredRuleIds: [], mention: null } });
     const g = grade(s, tr({ system: "baseline", turns: [turn({ outcome: "answered" })] }));

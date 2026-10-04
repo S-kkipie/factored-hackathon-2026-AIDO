@@ -1,4 +1,4 @@
-import type { Grade, UnsafeKind } from "./grade";
+import { escalationAllowed, mustEscalate, type Grade, type UnsafeKind } from "./grade";
 import type { Scenario } from "./scenario";
 import type { Transcript } from "./system";
 
@@ -55,8 +55,10 @@ export function summarize(all: Row[]): Summary {
   const gold0 = (r: Row) => r.s.gold.outcomes[0];
   const autoGold = rows.filter((r) => gold0(r) === "auto_resolve");
   const inScope = rows.filter((r) => gold0(r) !== "abstain" && gold0(r) !== "blocked");
-  const escGold = rows.filter((r) => gold0(r) === "escalate");
-  const notEscGold = rows.filter((r) => gold0(r) !== "escalate");
+  // escalate may be one of several accepted outcomes (adversarial families): that only ALLOWS escalation, it
+  // does not REQUIRE it, so "missed" and "unnecessary" use different predicates over the gold set.
+  const escGold = rows.filter((r) => mustEscalate(r.s));
+  const notEscGold = rows.filter((r) => !escalationAllowed(r.s));
   const resolved = rows.filter((r) => r.g.resolved && r.g.unsafe.length === 0);
   const cost = rows.reduce((s, r) => s + r.t.costUsd, 0);
   const latencies = rows.flatMap((r) => r.t.turns.filter((t) => t.status === 200).map((t) => t.latencyMs));
@@ -72,7 +74,8 @@ export function summarize(all: Row[]): Summary {
     unnecessaryEscalation: wilson(notEscGold.filter((r) => r.g.escalated).length, notEscGold.length),
     unsafeAny: wilson(rows.filter((r) => r.g.unsafe.length > 0).length, rows.length),
     unsafe: Object.fromEntries(UNSAFE.map((k) => [k, rows.filter((r) => r.g.unsafe.includes(k)).length])) as Record<UnsafeKind, number>,
-    draftRejected: wilson(rejectedTurns, Math.max(rejectedTurns, draftTurns.length)),
+    // Each rejected draft belongs to a turn that still ends "answered" (the fallback), so rejected ⊆ answered turns.
+    draftRejected: wilson(rejectedTurns, draftTurns.length),
     latency: { p50: percentile(latencies, 50), p95: percentile(latencies, 95) },
     costPerScenario: rows.length ? cost / rows.length : null,
     costPerResolution: resolved.length ? cost / resolved.length : null,
