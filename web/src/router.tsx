@@ -4,7 +4,7 @@ import { AgentPage } from "./pages/AgentPage";
 import { ChatPage } from "./pages/ChatPage";
 import { LoginPage } from "./pages/LoginPage";
 import { TracePage } from "./pages/TracePage";
-import { readCustomer } from "./session";
+import { clearCustomer, readCustomer } from "./session";
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -27,7 +27,12 @@ export const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/chat",
   beforeLoad: () => {
-    if (!readCustomer()) throw redirect({ to: "/login" });
+    const customer = readCustomer();
+    if (!customer) throw redirect({ to: "/login" });
+    if (customer.expiresAt < Date.now()) {
+      clearCustomer();
+      throw redirect({ to: "/login", search: { expired: true } });
+    }
   },
   component: ChatPage,
 });

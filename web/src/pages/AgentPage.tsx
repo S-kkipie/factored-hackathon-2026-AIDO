@@ -189,7 +189,7 @@ function CaseDetail({
     <div>
       <div className="toolbar">
         <h2>Caso derivado</h2>
-        <Link to="/trace/$session" params={{ session: item.sessionId }} target="_blank">
+        <Link to="/trace/$session" params={{ session: item.sessionId }} target="_blank" rel="opener">
           Ver traza
         </Link>
       </div>

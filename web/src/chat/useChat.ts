@@ -39,6 +39,24 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
     return () => sub.unsubscribe();
   }, []);
 
+  // On a fresh page load (e.g. the customer reloads while a human agent holds the conversation), there's no
+  // AG-UI run to report the handoff via STATE_DELTA, so the handed-off state would otherwise be lost. Ask the
+  // server directly once on mount.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const info = await customerApi.session();
+        if (alive && info.status === "handed_off") dispatch({ type: "session_status", status: "handed_off", notice: "" });
+      } catch (e) {
+        if (alive && e instanceof ApiError && e.status === 401) onExpired();
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [onExpired]);
+
   const failed = useCallback(async () => {
     dispatch({ type: "failed", message: t.turnFailed });
     // runAgent()'s thrown error is a raw client/network failure, not an ApiError, so 401 (session expiry)
@@ -102,6 +120,12 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
         const msgs = await customerApi.chatMessages(stateRef.current.lastAgentMessageId);
         if (alive && msgs.length > 0) dispatch({ type: "agent_messages", messages: msgs });
         const info = await customerApi.session();
+        if (alive && info.status === "active" && stateRef.current.handedOff) {
+          // The agent may have sent a last reply right before resolving the case; pick it up before the
+          // handed-off banner disappears, or that message would be lost.
+          const last = await customerApi.chatMessages(stateRef.current.lastAgentMessageId);
+          if (alive && last.length > 0) dispatch({ type: "agent_messages", messages: last });
+        }
         if (alive) dispatch({ type: "session_status", status: info.status, notice: t.backToAssistant });
       } catch (e) {
         if (alive && e instanceof ApiError && e.status === 401) onExpired();

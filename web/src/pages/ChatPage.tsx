@@ -61,7 +61,7 @@ function Chat({ session }: { session: StoredCustomer }) {
           <span className="muted"> · {session.language.toUpperCase()}</span>
         </div>
         <div className="row">
-          <Link to="/trace/$session" params={{ session: session.sessionId }} target="_blank">
+          <Link to="/trace/$session" params={{ session: session.sessionId }} target="_blank" rel="opener">
             {t.viewTrace}
           </Link>
           <button type="button" onClick={logout}>

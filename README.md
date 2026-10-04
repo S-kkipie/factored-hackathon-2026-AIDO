@@ -143,6 +143,8 @@ bun run dev:web                              # web app on http://localhost:5173 
 bun run smoke                                # scripted ES/PT turns over data/serving.sqlite
 ```
 
+`bun run dev` also serves the last `web/dist` build if one exists (it's the same `WEB_DIR` static serving as production), so a stale UI can keep showing up at :8080 after source changes. Use `bun run dev:web` on :5173 for live UI work.
+
 Single process, as deployed: `bun run build:web && bun run start` serves the web app and the API together on :8080 (`WEB_DIR` overrides the build directory). HTML is served with a strict Content-Security-Policy.
 
 **Web app** (spec 9). Demo PINs: customer `2468`, agent `1357`.

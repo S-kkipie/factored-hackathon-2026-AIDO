@@ -151,6 +151,9 @@ export function chatReducer(s: ChatState, a: ChatAction): ChatState {
       if (a.status === "active" && s.handedOff) {
         return { ...s, handedOff: false, lines: [...s.lines, { id: `sys-${s.lines.length}`, author: "system", text: a.notice }] };
       }
+      if (a.status === "handed_off" && !s.handedOff) {
+        return { ...s, handedOff: true };
+      }
       return s;
     case "failed":
       return { ...s, running: false, step: null, error: a.message };

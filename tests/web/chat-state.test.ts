@@ -110,6 +110,22 @@ describe("chatReducer", () => {
     expect(chatReducer(back, { type: "session_status", status: "active", notice: "De vuelta" }).lines.length).toBe(back.lines.length);
   });
 
+  test("a 'handed_off' session_status marks the chat handed off with no notice line", () => {
+    const s = chatReducer(initialChat, { type: "session_status", status: "handed_off", notice: "" });
+    expect(s.handedOff).toBe(true);
+    expect(s.lines).toEqual([]);
+    // Idempotent: a second report of the same status doesn't add another line or change identity-sensitive state.
+    const again = chatReducer(s, { type: "session_status", status: "handed_off", notice: "" });
+    expect(again).toBe(s);
+  });
+
+  test("'handed_off' then 'active' round-trips through the notice-adding path", () => {
+    const handed = chatReducer(initialChat, { type: "session_status", status: "handed_off", notice: "" });
+    const back = chatReducer(handed, { type: "session_status", status: "active", notice: "De vuelta" });
+    expect(back.handedOff).toBe(false);
+    expect(back.lines.at(-1)).toMatchObject({ author: "system", text: "De vuelta" });
+  });
+
   test("RUN_ERROR and client failures stop the run with an error", () => {
     const s = reduce([
       ev({ type: EventType.RUN_STARTED, threadId: "t", runId: "r" }),

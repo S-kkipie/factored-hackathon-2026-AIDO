@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { ApiError } from "../lib/api";
 import { type Lang, PERSONAS, T, personaText } from "../lib/i18n";
 import { loginRoute } from "../router";
-import { customerApi, writeCustomer } from "../session";
+import { clearCustomer, customerApi, readCustomer, writeCustomer } from "../session";
 
 export function LoginPage() {
   const { expired } = loginRoute.useSearch();
@@ -35,6 +35,14 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
+      if (readCustomer()) {
+        try {
+          await customerApi.logout();
+        } catch {
+          // Best-effort: the old server session may already be gone; log in fresh regardless.
+        }
+        clearCustomer();
+      }
       const r = await customerApi.login(persona, pin, lang);
       writeCustomer({ token: r.token, sessionId: r.sessionId, language: r.language, persona, expiresAt: r.expiresAt });
       await navigate({ to: "/chat" });
