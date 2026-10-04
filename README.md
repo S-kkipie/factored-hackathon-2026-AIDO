@@ -73,21 +73,48 @@ flowchart LR
 
 Diagrams of the data flow, conversation graph, GCP deployment, LangGraph runtime and guardrail harness are in [`docs/architecture.html`](docs/architecture.html) (download and open it locally).
 
-## Evaluation plan
+## Evaluation
 
-The baseline and the proposed system replay the same frozen held-out workload: about 200 multi-turn scenarios, half Spanish and half Portuguese. The workload covers normal, ambiguous, out-of-scope and must-escalate cases, plus attacks and injected tool failures. The only architectural difference between the two is the policy gate.
+The proposed system and a naive baseline replay the same frozen held-out workload of 200 scripted multi-turn scenarios (100 Spanish, 100 Portuguese). The baseline is Gemini function calling over the same tools, with no policy layer, confirmation step or output gate. Scenarios are built from hand-written ES/PT templates over customers and transactions picked by policy-relevant criteria (amount, fraud score, age, complaint history, status). They cover normal, ambiguous, out-of-scope and must-escalate cases, attacks (direct and indirect injection, prompt extraction, cross-customer access, expired session), injected tool failures and bad data, and Portuñol/regionalisms. Pass/fail is deterministic, with no LLM involved:
+- outcome class;
+- rule ids;
+- dispute rows in `ops.sqlite`;
+- the expected facts in the reply;
+- a cross-customer leak and prompt/canary scan.
 
-- **Pass/fail is deterministic:** outcome class, rule ids in the trace, whether the dispute exists in the database, and a cross-customer data leak scan. An LLM judge scores only response quality, and is validated against human labels (Cohen's κ ≥ 0.6).
-- **Red teaming uses [promptfoo](https://www.promptfoo.dev/):** OWASP LLM and Agentic plugins in ES/PT, multi-turn strategies (Crescendo, GOAT, Hydra), and indirect injection through data fields.
-- **Reported metrics:**
-  - safe automated resolution rate;
-  - containment (reported separately, not as success);
-  - missed and unnecessary escalations;
-  - unsafe outcomes with counts and denominators;
-  - attack success rate per class;
-  - false refusals;
-  - p50/p95 latency and cost per case;
-  - all of the above by language, with small-sample caveats.
+**Results** on the frozen test set ([`reports/eval.md`](reports/eval.md); 95% Wilson intervals). The baseline ran on a stratified 60% subset (160 scenarios) to fit the budget, so the proposed column is shown on the same scenarios.
+
+| Metric | Proposed (same 160) | Baseline (160) |
+|---|---|---|
+| Pass, all deterministic checks | 95.6% (91.2–97.9) | 58.3% (50.5–65.8) |
+| Safe automated resolution | 97.0% (89.6–99.2) · 64/66 | 71.2% (59.4–80.7) · 47/66 |
+| Missed escalations (must be zero) | 1/32 | 26/32 |
+| Unnecessary escalations | 0/112 | 20/108 |
+| Unsafe outcomes | 1/160 | 31/156 (16 forbidden disputes) |
+| Latency per turn p50 / p95 | 1.5 s / 3.4 s | 2.9 s / 6.0 s |
+| Cost per scenario | $0.00043 | $0.00256 |
+
+The run found four defects, all fixed on the dev split or after the test run, with regression tests:
+1. Checkpoint ordering. Under WSL the wall clock stepped back during an LLM call, so a uuid6 checkpoint id sorted before an older one. "Latest" is now the last written checkpoint. This one bug caused both an empty reply after a handoff and a valid dispute confirmation rejected with `TL_NONCE_MISMATCH`.
+2. Merchant search folded case only for ASCII. "Óptica Visión" was never found, which caused the one missed escalation.
+3. The response gate read `4271.5` as 4,271,5.
+4. The model translated "Approved" to "aprovado", which the commitment check flagged.
+
+Model drafts rejected by the response gate went from 7/18 to 0/18 on dev. A post-fix rerun of the proposed system on all 200 test scenarios ([`reports/eval-postfix.md`](reports/eval-postfix.md)) gives 191/200 passing, 0 unsafe outcomes, 0/42 missed escalations and pass^4 = 20/20. The remaining failures are:
+- 7 router misclassifications: six context-free fragments ("eso mismo", "E o outro?") answered as greetings, and one charge question routed out of scope;
+- 2 transient Gemini errors, which were handed off to a human safely.
+
+Because the defects were found on the test run, the post-fix numbers are optimistic and are labeled as a rerun.
+
+Limitations:
+- Templates are shared between dev and test, with different customers.
+- Small samples per category.
+- The `dispute_fraud` pool has about 5 transactions in the data.
+- The baseline's clarify/abstain outcomes are ungraded.
+
+Still to do (plan 5b):
+- an LLM judge for response quality, validated against human labels (Cohen's κ);
+- promptfoo red teaming (OWASP LLM and Agentic, ES/PT, multi-turn) with attack success rate per class and false refusals.
 
 ## Stack
 
@@ -186,6 +213,16 @@ Optional env: `ROUTER` (`auto` default, `keyword`, `embed-lr`), `GEMINI_MODEL` (
 
 **Limits:** the per-session lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are in-process state — run a single instance (e.g. Cloud Run `--max-instances=1`); that state (and the SQLite-backed sessions, checkpoints and queue) is lost on restart. The production path is Postgres/Redis for this state (see [Known limitations](#known-limitations)). `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
 
+### Evaluate
+
+```bash
+bun run eval:build    # data/eval/{dev,test}.json from serving.sqlite (private); hashes in eval/frozen.json
+bun run eval -- --split dev --systems proposed --limit-usd 0.05
+bun run eval -- --split test --systems proposed,baseline --limit-usd 0.9 --baseline-share 0.6 --repeat 4 --repeat-n 20
+```
+
+Every run needs `--limit-usd`. A run stops starting scenarios when it reaches that limit, and spend is recorded in the shared ledger. A test run is refused if the scenario file's hash differs from `eval/frozen.json`. Raw transcripts go to `data/eval/runs/` (private); only aggregate reports are committed.
+
 ### Train the intent router
 
 Latest run (`reports/router.md`): keyword baseline macro-F1 0.631, embeddings + logistic regression 0.975 (selected; deployed threshold 0.60), Gemini zero-shot 1.000 (not deployable: it would add a fourth model call per turn). Both trained/zero-shot scores are near ceiling on a clean, hand-written test set written by the same author as the seeds (113 near-duplicate training rows were dropped); expect lower accuracy on real traffic, which plan 5 measures end to end. Total cost of data generation and training: about USD 0.19.
@@ -216,7 +253,8 @@ Pipeline outputs:
 | 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
 | 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
 | 4 | Web UI: chat, agent console, trace viewer | done |
-| 5 | Evaluation harness and red teaming | planned |
+| 5a | Evaluation harness: 200 ES/PT scenarios, deterministic grading, naive baseline | done |
+| 5b | LLM judge with human labels, promptfoo red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |
 
 ## Known limitations
