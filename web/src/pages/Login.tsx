@@ -35,7 +35,7 @@ export function LoginPage() {
     try {
       const r = await api.login(persona, pin, language);
       session.setCustomer({ token: r.token, sessionId: r.sessionId, persona, language, expiresAt: r.expiresAt });
-      await navigate({ to: "/chat" });
+      await navigate({ to: "/inicio" });
     } catch (err) {
       setError(err instanceof ApiError && err.status === 401 ? t.badCredentials : t.serverDown);
     } finally {

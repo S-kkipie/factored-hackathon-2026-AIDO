@@ -1,12 +1,17 @@
 import { Outlet, RouterProvider, createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { CustomerShell } from "./components/CustomerShell";
 import { AgentPage } from "./pages/Agent";
+import { CasesPage } from "./pages/Cases";
 import { ChatPage } from "./pages/Chat";
+import { HomePage } from "./pages/Home";
 import { LoginPage } from "./pages/Login";
+import { SupervisionPage } from "./pages/Supervision";
 import { TracePage } from "./pages/Trace";
 import { session } from "./session";
 import "./styles.css";
+import "./pages.css";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 
@@ -14,27 +19,40 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: session.customer() ? "/chat" : "/login" });
+    throw redirect({ to: session.customer() ? "/inicio" : "/login" });
   },
 });
 
 const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: "/login", component: LoginPage });
 
-const chatRoute = createRoute({
+/** Customer area: one layout (navigation + shared conversation) for Home, Assistant and My cases. */
+const customerRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/chat",
+  id: "customer",
   beforeLoad: () => {
     if (!session.customer()) throw redirect({ to: "/login" });
   },
-  component: ChatPage,
+  component: CustomerShell,
 });
+const homeRoute = createRoute({ getParentRoute: () => customerRoute, path: "/inicio", component: HomePage });
+const chatRoute = createRoute({ getParentRoute: () => customerRoute, path: "/chat", component: ChatPage });
+const casesRoute = createRoute({ getParentRoute: () => customerRoute, path: "/casos", component: CasesPage });
 
 const agentRoute = createRoute({ getParentRoute: () => rootRoute, path: "/agent", component: AgentPage });
+
+const supervisionRoute = createRoute({ getParentRoute: () => rootRoute, path: "/supervision", component: SupervisionPage });
 
 const traceRoute = createRoute({ getParentRoute: () => rootRoute, path: "/trace/$session", component: TracePage });
 
 const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, loginRoute, chatRoute, agentRoute, traceRoute]),
+  routeTree: rootRoute.addChildren([
+    indexRoute,
+    loginRoute,
+    customerRoute.addChildren([homeRoute, chatRoute, casesRoute]),
+    agentRoute,
+    supervisionRoute,
+    traceRoute,
+  ]),
   defaultPreload: "intent",
 });
 

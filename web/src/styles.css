@@ -1,63 +1,76 @@
-/* AIDO design tokens ─ indigo brand, teal secondary, warm coral for attention. */
+/* AIDO design tokens ─ deep emerald brand, gold accent, warm cream surfaces.
+   Data colors validated (dataviz validator): light #1F8A6E/#B8860B on #FFFFFF, dark #26A07D/#B88A24 on #13201C. */
 :root {
-  --bg: #f5f6fb;
+  --bg: #f7f5ef;
   --surface: #ffffff;
-  --surface-2: #f0f2f8;
-  --surface-3: #e7eaf3;
-  --border: #e1e5ef;
-  --text: #121731;
-  --muted: #646b85;
-  --brand: #4f46e5;
-  --brand-2: #0ea5a0;
-  --brand-strong: #3b33c4;
+  --surface-2: #f3f0e7;
+  --surface-3: #ebe6d8;
+  --border: #e6e1d3;
+  --text: #10231e;
+  --muted: #5f6b66;
+  --brand: #0b5d4b;
+  --brand-deep: #073d32;
+  --brand-2: #c9a227;
+  --brand-strong: #084a3c;
   --brand-ink: #ffffff;
-  --brand-soft: #eceafe;
-  --teal-soft: #e2f6f4;
-  --coral: #e8590c;
-  --coral-soft: #fff0e6;
-  --danger: #d92d20;
-  --danger-soft: #fdecea;
-  --success: #079455;
-  --success-soft: #e3f7ec;
-  --warn: #b54708;
-  --warn-soft: #fef4e6;
-  --user-bg: #4f46e5;
+  --brand-soft: #e3efe9;
+  --gold: #c9a227;
+  --gold-ink: #3d2f05;
+  --gold-soft: #f8f0d6;
+  --teal-soft: #e3efe9;
+  --data: #1f8a6e;
+  --data-2: #b8860b;
+  --coral: #c2410c;
+  --coral-soft: #fdeee4;
+  --danger: #c0262d;
+  --danger-soft: #fbe9e9;
+  --success: #12795c;
+  --success-soft: #e1f3ec;
+  --warn: #9a6400;
+  --warn-soft: #fbf1db;
+  --user-bg: #0b5d4b;
   --user-ink: #ffffff;
-  --model: #7a5af8;
+  --model: #8a6d12;
   --radius: 16px;
   --radius-sm: 10px;
-  --shadow-sm: 0 1px 2px rgb(18 23 49 / 6%);
-  --shadow: 0 1px 2px rgb(18 23 49 / 5%), 0 10px 30px -12px rgb(18 23 49 / 14%);
+  --shadow-sm: 0 1px 2px rgb(16 35 30 / 6%);
+  --shadow: 0 1px 2px rgb(16 35 30 / 5%), 0 12px 32px -14px rgb(16 35 30 / 18%);
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c0f1d;
-    --surface: #141831;
-    --surface-2: #1a1f3b;
-    --surface-3: #232949;
-    --border: #2a3053;
-    --text: #e8eaf6;
-    --muted: #9aa1c0;
-    --brand: #7c74ff;
-    --brand-2: #2dd4bf;
-    --brand-strong: #948dff;
-    --brand-ink: #0c0f1d;
-    --brand-soft: #232454;
-    --teal-soft: #113a3a;
-    --coral: #ff8a4c;
+    --bg: #0d1714;
+    --surface: #13201c;
+    --surface-2: #192a25;
+    --surface-3: #22362f;
+    --border: #2a3f37;
+    --text: #e8efea;
+    --muted: #9db0a7;
+    --brand: #26a07d;
+    --brand-deep: #0b5d4b;
+    --brand-2: #d4ad3d;
+    --brand-strong: #34b38e;
+    --brand-ink: #04130e;
+    --brand-soft: #173a30;
+    --gold: #d4ad3d;
+    --gold-ink: #2a2004;
+    --gold-soft: #3a3015;
+    --teal-soft: #173a30;
+    --data: #26a07d;
+    --data-2: #b88a24;
+    --coral: #f08a4b;
     --coral-soft: #3a2316;
-    --danger: #ff7a6e;
-    --danger-soft: #3b1b1a;
-    --success: #4ade80;
-    --success-soft: #133524;
-    --warn: #fbbf62;
-    --warn-soft: #3a2a12;
-    --user-bg: #5b52f0;
+    --danger: #f2787a;
+    --danger-soft: #3b1b1c;
+    --success: #4fd1a5;
+    --success-soft: #133a2e;
+    --warn: #e9b949;
+    --warn-soft: #3a2e12;
+    --user-bg: #1b7a60;
     --user-ink: #ffffff;
-    --model: #a594ff;
+    --model: #e0b84a;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 30px -12px rgb(0 0 0 / 50%);
     color-scheme: dark;
@@ -403,9 +416,9 @@ a:focus-visible {
   gap: 32px;
   color: #fff;
   background:
-    radial-gradient(1200px 500px at -10% -20%, rgb(255 255 255 / 14%), transparent 60%),
-    radial-gradient(800px 500px at 120% 120%, rgb(14 165 160 / 55%), transparent 60%),
-    linear-gradient(140deg, #3730a3, #4f46e5 55%, #0e7490);
+    radial-gradient(1100px 520px at -10% -20%, rgb(255 255 255 / 10%), transparent 60%),
+    radial-gradient(700px 460px at 115% 115%, rgb(201 162 39 / 38%), transparent 60%),
+    linear-gradient(150deg, #052b23, #0b5d4b 60%, #0f6b55);
 }
 .auth-hero .wordmark-sub {
   color: rgb(255 255 255 / 75%);
@@ -436,7 +449,7 @@ a:focus-visible {
 .preview-bubble.user {
   align-self: flex-end;
   background: rgb(255 255 255 / 92%);
-  color: #1e1b4b;
+  color: #10231e;
   border-bottom-right-radius: 4px;
 }
 .preview-bubble.assistant {
@@ -451,7 +464,7 @@ a:focus-visible {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #5eead4;
+  background: var(--gold);
   margin-top: 7px;
   flex: none;
 }

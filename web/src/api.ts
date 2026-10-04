@@ -51,6 +51,9 @@ export const api = {
   resolve: (token: string, sessionId: string) =>
     request<{ ok: boolean }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/resume`, { method: "POST" }, token),
   trace: (token: string, sessionId: string) => request<Span[]>(`/api/trace/${encodeURIComponent(sessionId)}`, {}, token),
+  overview: (token: string) => request<CustomerOverview>("/api/me/overview", {}, token),
+  cases: (token: string) => request<CustomerCase[]>("/api/me/cases", {}, token),
+  metrics: (token: string, hours: number) => request<OpsMetrics>(`/api/ops/metrics?hours=${hours}`, {}, token),
 };
 
 export interface ChatMessage {
@@ -203,4 +206,44 @@ export interface TurnView {
   candidates?: ViewTransaction[];
   dispute?: ViewDispute;
   handoffId?: string;
+}
+
+// ── Home, cases and supervision read models ──────────────────────────────────────────────────────────────
+
+export interface CustomerOverview {
+  asOf: string;
+  customer: { firstName: string; segment: string; country: string; status: string } | null;
+  products: ViewProduct[];
+  recent: ViewTransaction[];
+  spending30d: { category: string; usd: number; count: number }[];
+  monthly: { month: string; usd: number; count: number }[];
+}
+
+export interface CustomerCase {
+  kind: "dispute" | "handoff";
+  id: string;
+  status: "received" | "in_review" | "queued" | "taken" | "resolved";
+  createdAt: string;
+  resolvedAt: string | null;
+  transactionIds: string[];
+  amountUsd: number | null;
+  reason: string | null;
+}
+
+export type OutcomeKind = "answered" | "dispute_created" | "handoff" | "abstain" | "clarify" | "greeting" | "cancelled";
+
+export interface OpsMetrics {
+  since: string;
+  sessions: number;
+  turns: number;
+  outcomes: Record<OutcomeKind, number>;
+  automatedResolutionRate: number | null;
+  latencyMs: { p50: number | null; p95: number | null };
+  llm: { calls: number; tokens: number; costUsd: number };
+  disputes: { count: number; amountUsd: number };
+  queue: { queued: number; taken: number; resolved: number };
+  escalationsByRule: { ruleId: string; count: number }[];
+  intents: { label: string; count: number; avgConfidence: number }[];
+  security: { ruleId: string; count: number }[];
+  hourly: { hour: string; turns: number; handoffs: number }[];
 }

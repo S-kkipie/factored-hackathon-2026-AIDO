@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, type ChatMessage, type QueueItem, api } from "../api";
 import { Avatar, Wordmark } from "../components/Brand";
+import { ConsoleRail } from "../components/ConsoleRail";
 import { ago } from "../format";
 import { PRIORITY_RANK, type Priority, RULE_TEXT, priorityOf } from "../rules";
 import { type AgentSession, session } from "../session";
@@ -188,8 +189,7 @@ export function AgentPage() {
 
   return (
     <div className="console">
-      <aside className="console-rail">
-        <Wordmark size={30} sub="Consola" />
+      <ConsoleRail agent={agent} onLogout={() => setAgent(null)}>
         <div className="rail-stats">
           <div>
             <span className="stat-num">{waiting}</span>
@@ -204,18 +204,7 @@ export function AgentPage() {
             <span className="muted small">alta</span>
           </div>
         </div>
-        <button
-          type="button"
-          className="ghost full"
-          onClick={async () => {
-            await api.logout(agent.token).catch(() => {});
-            session.setAgent(null);
-            setAgent(null);
-          }}
-        >
-          Cerrar sesión
-        </button>
-      </aside>
+      </ConsoleRail>
 
       <section className="queue-col" aria-label="Cola de casos">
         <header className="queue-head">

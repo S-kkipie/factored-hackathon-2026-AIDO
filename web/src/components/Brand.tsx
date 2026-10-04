@@ -4,13 +4,13 @@ export function Logo({ size = 32 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true" className="logo">
       <defs>
         <linearGradient id="aido-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="var(--brand)" />
-          <stop offset="1" stopColor="var(--brand-2)" />
+          <stop offset="0" stopColor="#0f6b55" />
+          <stop offset="1" stopColor="#073d32" />
         </linearGradient>
       </defs>
       <rect width="40" height="40" rx="11" fill="url(#aido-g)" />
       <path d="M11 29 20 10l9 19" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M14.6 22.5h10.8l-2.6 3.6" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14.6 22.5h10.8l-2.6 3.6" fill="none" stroke="#d9b23a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
