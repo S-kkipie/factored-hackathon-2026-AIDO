@@ -13,7 +13,8 @@
     "start": "bun server/main.ts",
     "smoke": "bun server/smoke.ts",
     "ml:generate": "bun ml/generate.ts",
-    "train": "bun ml/train.ts"
+    "train": "bun ml/train.ts",
+    "eval:build": "bun eval/build.ts"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.1",
