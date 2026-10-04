@@ -2,13 +2,14 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { api } from "../api";
 import { type AgentSession, session } from "../session";
-import { Wordmark } from "./Brand";
+import { Guilloche, Wordmark } from "./Brand";
 
 /** Left rail shared by the agent console and the supervision dashboard. */
 export function ConsoleRail({ agent, onLogout, children }: { agent: AgentSession; onLogout: () => void; children?: ReactNode }) {
   return (
     <aside className="console-rail">
-      <Wordmark size={30} sub="Equipo AIDO" />
+      <Guilloche className="sidebar-rosette" opacity={0.22} />
+      <Wordmark size={32} sub="Equipo AIDO" light />
       <nav className="side-nav" aria-label="Consola">
         <Link to="/agent" className="side-link" activeProps={{ className: "side-link active" }} activeOptions={{ exact: true }}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">

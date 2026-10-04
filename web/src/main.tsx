@@ -12,6 +12,7 @@ import { TracePage } from "./pages/Trace";
 import { session } from "./session";
 import "./styles.css";
 import "./pages.css";
+import "./brand.css";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 

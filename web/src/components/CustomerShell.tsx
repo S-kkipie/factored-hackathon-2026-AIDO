@@ -4,7 +4,7 @@ import { api } from "../api";
 import { ChatProvider, useChat } from "../chat";
 import { strings } from "../i18n";
 import { type CustomerSession, session } from "../session";
-import { Wordmark } from "./Brand";
+import { Guilloche, Wordmark } from "./Brand";
 
 const ICONS = {
   home: <path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />,
@@ -36,7 +36,7 @@ function Nav({ s }: { s: CustomerSession }) {
   );
   return (
     <aside className="sidebar">
-      <Wordmark size={34} sub={t.brandTagline} />
+      <Wordmark size={36} sub={t.brandTagline} light />
       <nav className="side-nav" aria-label={t.navLabel}>
         {link("/inicio", "home", t.navHome)}
         {link("/chat", "chat", t.assistantNav, chat.pending !== null)}
@@ -89,6 +89,7 @@ export function CustomerShell() {
     <ChatProvider session={s}>
       <div className="app-shell">
         <div className="sidebar-wrap">
+          <Guilloche className="sidebar-rosette" opacity={0.22} />
           <Nav s={s} />
           <Foot s={s} />
         </div>

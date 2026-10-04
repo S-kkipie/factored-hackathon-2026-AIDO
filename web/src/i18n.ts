@@ -2,6 +2,8 @@ import type { Language } from "./api";
 
 const es = {
   navHome: "Inicio",
+  creditAvailable: "Crédito disponible",
+  creditLabel: "Crédito",
   navCases: "Mis casos",
   goodDay: "Hola",
   asOf: "Datos al",
@@ -30,6 +32,7 @@ const es = {
   reasons: { unrecognized: "Cargo no reconocido", incorrect_amount: "Monto incorrecto", duplicate: "Cargo duplicado" } as Record<string, string>,
   loading: "Cargando…",
   brandTagline: "Banca digital",
+  heroPoints: ["Saldos y movimientos al instante", "Disputas en minutos, siempre con su confirmación", "Un agente humano cuando lo necesite"],
   loginTitle: "Bienvenido a AIDO",
   loginSubtitle: "Atención al cliente con Aida, su asistente: saldos, movimientos y disputas, a cualquier hora.",
   chooseCustomer: "Ingresar como",
@@ -100,6 +103,8 @@ const es = {
 
 const pt: typeof es = {
   navHome: "Início",
+  creditAvailable: "Limite disponível",
+  creditLabel: "Crédito",
   navCases: "Meus casos",
   goodDay: "Olá",
   asOf: "Dados de",
@@ -128,6 +133,7 @@ const pt: typeof es = {
   reasons: { unrecognized: "Cobrança não reconhecida", incorrect_amount: "Valor incorreto", duplicate: "Cobrança duplicada" },
   loading: "Carregando…",
   brandTagline: "Banco digital",
+  heroPoints: ["Saldo e extrato na hora", "Contestações em minutos, sempre com sua confirmação", "Um atendente humano quando você precisar"],
   loginTitle: "Bem-vindo ao AIDO",
   loginSubtitle: "Atendimento com a Aida, sua assistente: saldo, extrato e contestações, a qualquer hora.",
   chooseCustomer: "Entrar como",

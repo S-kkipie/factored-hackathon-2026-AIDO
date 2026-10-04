@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ApiError, type CustomerOverview, api } from "../api";
+import { BankCard, Guilloche, Waves } from "../components/Brand";
 import { ProductCards, TransactionTable } from "../components/Cards";
 import { BarList, Columns } from "../components/Charts";
 import { useChat } from "../chat";
@@ -42,30 +43,42 @@ export function HomePage() {
 
   if (!s) return null;
   const total30 = data?.spending30d.reduce((sum, c) => sum + c.usd, 0) ?? 0;
+  const credit = data?.products.find((p) => p.credit_limit !== null);
 
   return (
     <main className="page">
-      <header className="page-head">
-        <div>
+      <section className="home-hero">
+        <Guilloche className="home-hero-rosette" opacity={0.3} />
+        <Waves className="home-hero-waves" opacity={0.16} />
+        <div className="home-hero-copy">
+          <span className="home-hero-eyebrow">{data ? `${t.asOf} ${shortDate(data.asOf, lang)}` : t.loading}</span>
           <h1>
             {t.goodDay}
             {data?.customer ? `, ${data.customer.firstName}` : ""}
           </h1>
-          {data && (
-            <p className="muted">
-              {t.asOf} {shortDate(data.asOf, lang)} · {data.customer?.segment}
-            </p>
-          )}
+          <div className="home-hero-stats">
+            <div>
+              <span className="stat-label">{t.spending30}</span>
+              <span className="stat-value">{money(total30, "USD", lang)}</span>
+            </div>
+            {credit && credit.credit_limit !== null && (
+              <div>
+                <span className="stat-label">{t.creditAvailable}</span>
+                <span className="stat-value">{money(credit.credit_limit - credit.current_balance, credit.currency, lang)}</span>
+              </div>
+            )}
+          </div>
+          <div className="row">
+            <button type="button" className="gold" onClick={() => void navigate({ to: "/chat" })}>
+              {t.askAida}
+            </button>
+            <button type="button" className="glass" onClick={() => void ask(t.suggestions[2]!)}>
+              {t.qaReport}
+            </button>
+          </div>
         </div>
-        <div className="row">
-          <button type="button" className="secondary" onClick={() => void ask(t.suggestions[0]!)}>
-            {t.qaBalance}
-          </button>
-          <button type="button" className="primary" onClick={() => void navigate({ to: "/chat" })}>
-            {t.askAida}
-          </button>
-        </div>
-      </header>
+        {credit && <BankCard masked={credit.product_number_masked} label={t.creditLabel} holder={data?.customer?.firstName.toUpperCase()} />}
+      </section>
 
       {error && <p className="banner error">{error}</p>}
       {!data && !error && <p className="muted">{t.loading}</p>}

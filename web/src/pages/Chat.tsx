@@ -94,7 +94,7 @@ export function ChatPage() {
             return (
               <div key={l.id} className={`msg ${l.who}`}>
                 {(l.who === "assistant" || l.who === "agent") && <Avatar who={l.who} />}
-                <div className="msg-body">
+                <div className={`msg-body${l.view && (l.view.products?.length || l.view.transactions?.length || l.view.candidates?.length) ? " wide" : ""}`}>
                   {l.who === "agent" && <span className="msg-label">{t.agent}</span>}
                   {text && (
                     <div className="bubble">

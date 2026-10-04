@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 import { ApiError, type Language, api } from "../api";
-import { Wordmark } from "../components/Brand";
+import { BankCard, Guilloche, Logo, Waves, Wordmark } from "../components/Brand";
 import { strings } from "../i18n";
 import { session } from "../session";
 
@@ -45,17 +45,40 @@ export function LoginPage() {
 
   return (
     <main className="auth">
-      <section className="auth-hero" aria-hidden="true">
-        <Wordmark size={40} sub={t.brandTagline} />
-        <div className="hero-copy">
-          <h1>{t.loginTitle}</h1>
-          <p>{t.loginSubtitle}</p>
-        </div>
-        <div className="hero-preview">
-          <div className="preview-bubble user">{t.suggestions[2]}</div>
-          <div className="preview-bubble assistant">
-            <span className="preview-dot" />
-            {language === "es" ? "Encontré el movimiento. Confirme con el botón para registrar la disputa." : "Encontrei a movimentação. Confirme no botão para registrar a contestação."}
+      <section className="auth-hero">
+        <Guilloche className="hero-rosette" opacity={0.24} />
+        <Waves className="hero-waves" opacity={0.18} />
+        <Wordmark size={44} sub={t.brandTagline} light />
+        <div className="hero-main">
+          <div className="hero-copy">
+            <h1>{t.loginTitle}</h1>
+            <p>{t.loginSubtitle}</p>
+            <ul className="hero-points">
+              {t.heroPoints.map((point) => (
+                <li key={point}>
+                  <span className="hero-check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="hero-stage" aria-hidden="true">
+            <BankCard masked="•••• 2370" label={language === "es" ? "Crédito" : "Crédito"} holder="VALENTINA R." />
+            <div className="hero-chat">
+              <div className="preview-bubble user">{t.suggestions[2]}</div>
+              <div className="preview-bubble assistant">
+                <Logo size={22} />
+                <span>
+                  {language === "es"
+                    ? "Encontré el movimiento del 10 de junio. Confirme con el botón para registrar la disputa."
+                    : "Encontrei a movimentação de 10 de junho. Confirme no botão para registrar a contestação."}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
         <p className="hero-foot">{t.demoNote}</p>
