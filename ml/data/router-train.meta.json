@@ -1,0 +1,42 @@
+{
+  "createdAt": "2026-10-03T23:30:43.204Z",
+  "model": "gemini-3.8-flash",
+  "promptVersion": "2026-10-03.1",
+  "seedsHash": "d0e49f88b4262679f50cd18eee20dbc7fc48f749a12f6601d6457e4dad89d1ec",
+  "perFamily": 12,
+  "rows": 1146,
+  "families": 84,
+  "failedFamilies": [],
+  "failureReasons": {},
+  "stoppedBySpendCap": false,
+  "cachedFamilies": 0,
+  "droppedDuplicates": 19,
+  "droppedExcluded": 7,
+  "spentUsd": 0.0824685,
+  "manualRemovals": [
+    {
+      "id": "G-es-oos-1-07",
+      "label": "out_of_scope",
+      "text": "hola buenas tardes me llego un cobro que yo no reconozco en el resumen quiero desconocerlo",
+      "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+    },
+    {
+      "id": "G-es-oos-3-08",
+      "label": "out_of_scope",
+      "text": "me llego un cargo que yo no reconozco y ocupo un reembolso inmediato",
+      "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+    },
+    {
+      "id": "G-es-oos-5-05",
+      "label": "out_of_scope",
+      "text": "Hola ocupo pedir la devolucion de un cargo que no reconozco en mi tarjeta de credito",
+      "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+    },
+    {
+      "id": "G-pt-oos-3-07",
+      "label": "out_of_scope",
+      "text": "tem como estornar um pagamento duplicado feito ontem?",
+      "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+    }
+  ]
+}

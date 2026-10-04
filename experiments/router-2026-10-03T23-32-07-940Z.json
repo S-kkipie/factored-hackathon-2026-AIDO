@@ -1,0 +1,664 @@
+{
+  "runId": "router-2026-10-03T23-32-07-940Z",
+  "data": {
+    "testHash": "00b8259dd3504690dab0abd02970335521dd96fb7ec5da864d1f86b15b308223",
+    "trainHash": "3b8c2fc6ca24f02fb17dedfeda7a92ab396e056a5dc154fcc1b3bc642b41a0c2",
+    "trainRows": 860,
+    "devRows": 173,
+    "droppedNearTest": 113,
+    "droppedNearTestByGroup": {
+      "check_balance|es": {
+        "dropped": 35,
+        "kept": 47
+      },
+      "list_transactions|es": {
+        "dropped": 6,
+        "kept": 78
+      },
+      "explain_charge|es": {
+        "dropped": 0,
+        "kept": 84
+      },
+      "dispute_charge|es": {
+        "dropped": 2,
+        "kept": 82
+      },
+      "request_human|es": {
+        "dropped": 6,
+        "kept": 77
+      },
+      "out_of_scope|es": {
+        "dropped": 1,
+        "kept": 80
+      },
+      "greeting|es": {
+        "dropped": 3,
+        "kept": 78
+      },
+      "check_balance|pt": {
+        "dropped": 33,
+        "kept": 47
+      },
+      "list_transactions|pt": {
+        "dropped": 4,
+        "kept": 80
+      },
+      "explain_charge|pt": {
+        "dropped": 0,
+        "kept": 84
+      },
+      "dispute_charge|pt": {
+        "dropped": 1,
+        "kept": 83
+      },
+      "request_human|pt": {
+        "dropped": 10,
+        "kept": 71
+      },
+      "out_of_scope|pt": {
+        "dropped": 6,
+        "kept": 73
+      },
+      "greeting|pt": {
+        "dropped": 6,
+        "kept": 69
+      }
+    },
+    "devFamilies": [
+      "es-bal-1",
+      "es-dsp-5",
+      "es-exp-4",
+      "es-grt-2",
+      "es-hum-3",
+      "es-lst-2",
+      "es-oos-3",
+      "pt-bal-1",
+      "pt-dsp-5",
+      "pt-exp-4",
+      "pt-grt-2",
+      "pt-hum-3",
+      "pt-lst-2",
+      "pt-oos-3"
+    ]
+  },
+  "embedLr": {
+    "l2": 0.0001,
+    "temperature": 0.3,
+    "devMacroF1ByL2": {
+      "0.0001": 0.994454220658028,
+      "0.001": 0.976812934165178,
+      "0.01": 0.9587102552619794
+    }
+  },
+  "routers": [
+    {
+      "name": "keyword",
+      "version": "keyword-v1",
+      "threshold": 1,
+      "test": {
+        "n": 237,
+        "accuracy": 0.48523206751054854,
+        "macroF1": 0.6307873163585311,
+        "perClass": {
+          "check_balance": {
+            "precision": 0.92,
+            "recall": 0.6764705882352942,
+            "f1": 0.7796610169491526,
+            "support": 34
+          },
+          "list_transactions": {
+            "precision": 1,
+            "recall": 0.38235294117647056,
+            "f1": 0.5531914893617021,
+            "support": 34
+          },
+          "explain_charge": {
+            "precision": 1,
+            "recall": 0.2647058823529412,
+            "f1": 0.4186046511627907,
+            "support": 34
+          },
+          "dispute_charge": {
+            "precision": 1,
+            "recall": 0.7352941176470589,
+            "f1": 0.8474576271186441,
+            "support": 34
+          },
+          "request_human": {
+            "precision": 1,
+            "recall": 0.5882352941176471,
+            "f1": 0.7407407407407407,
+            "support": 34
+          },
+          "out_of_scope": {
+            "precision": 0.9230769230769231,
+            "recall": 0.35294117647058826,
+            "f1": 0.5106382978723405,
+            "support": 34
+          },
+          "greeting": {
+            "precision": 1,
+            "recall": 0.3939393939393939,
+            "f1": 0.5652173913043478,
+            "support": 33
+          }
+        },
+        "confusion": {
+          "check_balance": {
+            "check_balance": 23,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 1,
+            "greeting": 0,
+            "__abstain__": 10
+          },
+          "list_transactions": {
+            "check_balance": 0,
+            "list_transactions": 13,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0,
+            "__abstain__": 21
+          },
+          "explain_charge": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 9,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0,
+            "__abstain__": 25
+          },
+          "dispute_charge": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 25,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0,
+            "__abstain__": 9
+          },
+          "request_human": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 20,
+            "out_of_scope": 0,
+            "greeting": 0,
+            "__abstain__": 14
+          },
+          "out_of_scope": {
+            "check_balance": 2,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 12,
+            "greeting": 0,
+            "__abstain__": 20
+          },
+          "greeting": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 13,
+            "__abstain__": 20
+          }
+        },
+        "ece": 0.04113924050632872
+      },
+      "macroF1CI": [
+        0.5688267012896904,
+        0.6842595862458877
+      ],
+      "perLanguageMacroF1": {
+        "es": 0.6326135364300614,
+        "pt": 0.6253636839351124
+      },
+      "outOfScopeRecall": 0.35294117647058826,
+      "outOfScopeSafeRate": 1,
+      "atThreshold": {
+        "threshold": 1,
+        "coverage": 0,
+        "misrouteRate": 0
+      },
+      "coverageCurve": [
+        {
+          "threshold": 0,
+          "coverage": 1,
+          "misrouteRate": 0.5147679324894515
+        },
+        {
+          "threshold": 0.05,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.1,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.15,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.2,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.25,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.3,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.35,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.4,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.45,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.5,
+          "coverage": 0.4978902953586498,
+          "misrouteRate": 0.025423728813559324
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.4810126582278481,
+          "misrouteRate": 0.02631578947368421
+        },
+        {
+          "threshold": 0.95,
+          "coverage": 0.05485232067510549,
+          "misrouteRate": 0
+        },
+        {
+          "threshold": 1,
+          "coverage": 0,
+          "misrouteRate": 0
+        }
+      ],
+      "latencyMs": {
+        "p50": 0.0034140000061597675,
+        "p95": 0.00719799999933457
+      },
+      "usdPerClassification": 0,
+      "failures": 119
+    },
+    {
+      "name": "embed-lr",
+      "version": "embed-lr@1",
+      "threshold": 0,
+      "test": {
+        "n": 237,
+        "accuracy": 0.9746835443037974,
+        "macroF1": 0.9745077898462842,
+        "perClass": {
+          "check_balance": {
+            "precision": 1,
+            "recall": 1,
+            "f1": 1,
+            "support": 34
+          },
+          "list_transactions": {
+            "precision": 0.918918918918919,
+            "recall": 1,
+            "f1": 0.9577464788732395,
+            "support": 34
+          },
+          "explain_charge": {
+            "precision": 0.967741935483871,
+            "recall": 0.8823529411764706,
+            "f1": 0.923076923076923,
+            "support": 34
+          },
+          "dispute_charge": {
+            "precision": 0.9696969696969697,
+            "recall": 0.9411764705882353,
+            "f1": 0.955223880597015,
+            "support": 34
+          },
+          "request_human": {
+            "precision": 1,
+            "recall": 1,
+            "f1": 1,
+            "support": 34
+          },
+          "out_of_scope": {
+            "precision": 0.9714285714285714,
+            "recall": 1,
+            "f1": 0.9855072463768115,
+            "support": 34
+          },
+          "greeting": {
+            "precision": 1,
+            "recall": 1,
+            "f1": 1,
+            "support": 33
+          }
+        },
+        "confusion": {
+          "check_balance": {
+            "check_balance": 34,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0
+          },
+          "list_transactions": {
+            "check_balance": 0,
+            "list_transactions": 34,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0
+          },
+          "explain_charge": {
+            "check_balance": 0,
+            "list_transactions": 3,
+            "explain_charge": 30,
+            "dispute_charge": 1,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 0
+          },
+          "dispute_charge": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 1,
+            "dispute_charge": 32,
+            "request_human": 0,
+            "out_of_scope": 1,
+            "greeting": 0
+          },
+          "request_human": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 34,
+            "out_of_scope": 0,
+            "greeting": 0
+          },
+          "out_of_scope": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 34,
+            "greeting": 0
+          },
+          "greeting": {
+            "check_balance": 0,
+            "list_transactions": 0,
+            "explain_charge": 0,
+            "dispute_charge": 0,
+            "request_human": 0,
+            "out_of_scope": 0,
+            "greeting": 33
+          }
+        },
+        "ece": 0.02059110820260881
+      },
+      "macroF1CI": [
+        0.9519180674971262,
+        0.9915839411729823
+      ],
+      "perLanguageMacroF1": {
+        "es": 0.9571377035662749,
+        "pt": 0.9915893630179344
+      },
+      "outOfScopeRecall": 1,
+      "outOfScopeSafeRate": 1,
+      "atThreshold": {
+        "threshold": 0,
+        "coverage": 1,
+        "misrouteRate": 0.02531645569620253
+      },
+      "coverageCurve": [
+        {
+          "threshold": 0,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.05,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.1,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.15,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.2,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.25,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.3,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.35,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.4,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.45,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.5,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1,
+          "misrouteRate": 0.02531645569620253
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 0.9957805907172996,
+          "misrouteRate": 0.0211864406779661
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 0.9915611814345991,
+          "misrouteRate": 0.01702127659574468
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.9831223628691983,
+          "misrouteRate": 0.012875536480686695
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.9746835443037974,
+          "misrouteRate": 0.004329004329004329
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.9704641350210971,
+          "misrouteRate": 0
+        },
+        {
+          "threshold": 0.95,
+          "coverage": 0.9620253164556962,
+          "misrouteRate": 0
+        },
+        {
+          "threshold": 1,
+          "coverage": 0,
+          "misrouteRate": 0
+        }
+      ],
+      "latencyMs": {
+        "p50": 694.8074720000004,
+        "p95": 1076.283481999999
+      },
+      "usdPerClassification": 0.0000015183544303797467,
+      "failures": 0
+    }
+  ],
+  "selected": {
+    "router": "embed-lr",
+    "rationale": "embed-lr has test macro-F1 0.975 and out_of_scope safe rate 1.000; it meets the 0.8 out_of_scope safe rate floor"
+  },
+  "config": {
+    "seed": 20261003,
+    "devShare": 0.2,
+    "cosineCutoff": 0.95,
+    "l2Grid": [
+      0.0001,
+      0.001,
+      0.01
+    ],
+    "epochs": 300,
+    "zeroShotDevPerGroup": 5,
+    "latencySample": 20,
+    "embedLrVersion": "1"
+  },
+  "zeroShotDevSampleSize": null,
+  "spentUsd": 0.0029671500000000017,
+  "embedModel": "gemini-embedding-001",
+  "chatModel": "gemini-3.8-flash",
+  "zeroShotPromptVersion": "2026-10-03.1",
+  "generatorMeta": {
+    "createdAt": "2026-10-03T23:30:43.204Z",
+    "model": "gemini-3.8-flash",
+    "promptVersion": "2026-10-03.1",
+    "seedsHash": "d0e49f88b4262679f50cd18eee20dbc7fc48f749a12f6601d6457e4dad89d1ec",
+    "perFamily": 12,
+    "rows": 1146,
+    "families": 84,
+    "failedFamilies": [],
+    "failureReasons": {},
+    "stoppedBySpendCap": false,
+    "cachedFamilies": 0,
+    "droppedDuplicates": 19,
+    "droppedExcluded": 7,
+    "spentUsd": 0.0824685,
+    "manualRemovals": [
+      {
+        "id": "G-es-oos-1-07",
+        "label": "out_of_scope",
+        "text": "hola buenas tardes me llego un cobro que yo no reconozco en el resumen quiero desconocerlo",
+        "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+      },
+      {
+        "id": "G-es-oos-3-08",
+        "label": "out_of_scope",
+        "text": "me llego un cargo que yo no reconozco y ocupo un reembolso inmediato",
+        "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+      },
+      {
+        "id": "G-es-oos-5-05",
+        "label": "out_of_scope",
+        "text": "Hola ocupo pedir la devolucion de un cargo que no reconozco en mi tarjeta de credito",
+        "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+      },
+      {
+        "id": "G-pt-oos-3-07",
+        "label": "out_of_scope",
+        "text": "tem como estornar um pagamento duplicado feito ontem?",
+        "reason": "paraphrase drifted to an unrecognized/duplicate-charge dispute while labeled out_of_scope (reviewed by hand)"
+      }
+    ]
+  },
+  "gitSha": "bac8fa7f7cf1bc354e8cb205a7aa99f5c30142e5"
+}

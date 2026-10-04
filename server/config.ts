@@ -19,6 +19,12 @@ export interface ServerConfig {
   /** Secret mixed into the per-session canary token that must never appear in a reply. */
   canarySecret: string;
   port: number;
+  /** Shared, persistent record of every LLM call's cost (server, smoke, eval, ML scripts). */
+  spendLedgerPath: string;
+  /** Hard cap on total project LLM spend in USD (default 3). */
+  llmTotalCapUsd: number;
+  /** `ROUTER`: auto (experiment's selection), keyword or embed-lr. */
+  router: "auto" | "keyword" | "embed-lr";
 }
 
 /** Database selection shared by the server and the data scripts: Supabase/Postgres when DATABASE_URL is set, else PGlite. */
@@ -33,6 +39,18 @@ function positiveInt(name: string, raw: string | undefined, fallback: number): n
     throw new Error(`${name} must be a finite positive integer, got '${raw}'`);
   }
   return n;
+}
+
+function nonNegativeNumber(name: string, raw: string | undefined, fallback: number): number {
+  const n = raw === undefined ? fallback : Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new Error(`${name} must be a finite non-negative number, got '${raw}'`);
+  return n;
+}
+
+function routerChoice(raw: string | undefined): ServerConfig["router"] {
+  const v = raw ?? "auto";
+  if (v !== "auto" && v !== "keyword" && v !== "embed-lr") throw new Error(`ROUTER must be auto, keyword or embed-lr, got '${raw}'`);
+  return v;
 }
 
 export function loadServerConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
@@ -50,5 +68,8 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     modelTimeoutMs: positiveInt("MODEL_TIMEOUT_MS", env.MODEL_TIMEOUT_MS, 15000),
     canarySecret: secret,
     port: positiveInt("PORT", env.PORT, 8080),
+    spendLedgerPath: env.SPEND_LEDGER_PATH ?? join(ROOT, "data/spend-ledger.sqlite"),
+    llmTotalCapUsd: nonNegativeNumber("LLM_TOTAL_CAP_USD", env.LLM_TOTAL_CAP_USD, 3),
+    router: routerChoice(env.ROUTER),
   };
 }

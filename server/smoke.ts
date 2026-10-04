@@ -22,8 +22,9 @@ const env: Record<string, string | undefined> = {
   ...process.env,
   JWT_SECRET: process.env.JWT_SECRET ?? "smoke-secret-smoke-secret-smoke-secret",
 };
-const { app, llm, db } = await createServer(env);
-console.log(`model: ${llm?.model ?? "none"}`);
+const { app, llm, db, ledger } = await createServer(env);
+const spentBefore = await ledger.total();
+console.log(`model: ${llm?.model ?? "none"} · project LLM spend so far $${spentBefore.toFixed(4)} of $${ledger.capUsd}`);
 
 for (const [persona, language, text] of TURNS) {
   const login = await app.handle(
@@ -53,4 +54,6 @@ for (const [persona, language, text] of TURNS) {
   console.log(`  outcome=${String(get("/outcome"))} rules=${JSON.stringify(get("/ruleIds"))} run=${finished?.type}`);
   console.log(`  ${(reply || finished?.interrupts?.[0]?.message || "").replace(/\n/g, "\n  ")}`);
 }
+
+console.log(`\nthis run: $${((await ledger.total()) - spentBefore).toFixed(4)} · project total $${(await ledger.total()).toFixed(4)} of $${ledger.capUsd}`);
 await db.close();

@@ -11,6 +11,7 @@ import { inputGate } from "../gates/input";
 import { consumeNonce, issueNonce } from "../gates/nonce";
 import { canonicalJson, sha256Hex } from "../hash";
 import { createGateway } from "../llm/gateway";
+import type { SpendLedger } from "../llm/ledger";
 import type { Llm } from "../llm/types";
 import { BUDGETS, POLICY } from "../policy/config";
 import { render } from "../policy/templates";
@@ -34,6 +35,8 @@ export interface TurnDeps {
   /** Shared across turns: the provider circuit is process-wide. */
   breaker: CircuitBreaker;
   checkpointer: BaseCheckpointSaver;
+  /** Project-wide LLM spend cap; absent in tests that do not exercise it. */
+  ledger?: SpendLedger;
   now?: () => Date;
 }
 
@@ -85,6 +88,7 @@ function graphFor(deps: TurnDeps, session: CustomerSession, turn: number, now: D
       tracer,
       day: now.toISOString().slice(0, 10),
       timeoutMs: deps.cfg.modelTimeoutMs,
+      ledger: deps.ledger,
     }),
   };
   return { app: buildGraph(gd, deps.checkpointer), tracer };
@@ -156,7 +160,10 @@ async function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: 
         openQuestions: [],
         language: session.language,
       },
-      idempotencyKey: `${session.sessionId}:budget-${ruleId}-${turn}`,
+      // The turn count does not advance while the budget is exhausted, so the key also carries how many handoffs
+      // the session already had: a retry of the same escalation replays, a new one after an agent resolved the
+      // previous handoff gets its own row.
+      idempotencyKey: `${session.sessionId}:budget-${ruleId}-${turn}-${await handoffsOf(deps.ops, session.sessionId)}`,
     });
     await deps.auth.setStatus(session.sessionId, "handed_off");
     return true;
@@ -166,6 +173,9 @@ async function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: 
     return false;
   }
 }
+
+const handoffsOf = async (ops: Sql, sessionId: string) =>
+  (await ops.one<{ n: number }>("select count(*)::int as n from ops.handoffs where session_id = $1", [sessionId]))?.n ?? 0;
 
 const turnsOf = async (ops: Sql, sessionId: string) =>
   (await ops.one<{ turns: number }>("select turns from ops.sessions where session_id = $1", [sessionId]))?.turns ?? 0;

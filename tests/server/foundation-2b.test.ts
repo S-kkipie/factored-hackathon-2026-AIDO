@@ -44,6 +44,22 @@ describe("plan 2b configuration", () => {
     expect(POLICY.disputeReviewDays).toBe(10);
   });
 
+  test("ROUTER defaults to auto and accepts only known routers", () => {
+    const base = { JWT_SECRET: "x".repeat(32) };
+    expect(loadServerConfig(base).router).toBe("auto");
+    expect(loadServerConfig({ ...base, ROUTER: "embed-lr" }).router).toBe("embed-lr");
+    expect(() => loadServerConfig({ ...base, ROUTER: "gemini" })).toThrow("ROUTER");
+  });
+
+  test("the project LLM spend cap defaults to USD 3 and rejects invalid values", () => {
+    const base = { JWT_SECRET: "x".repeat(32) };
+    expect(loadServerConfig(base).llmTotalCapUsd).toBe(3);
+    expect(loadServerConfig(base).spendLedgerPath).toMatch(/data[\\/]spend-ledger\.sqlite$/);
+    expect(loadServerConfig({ ...base, LLM_TOTAL_CAP_USD: "0.5" }).llmTotalCapUsd).toBe(0.5);
+    expect(() => loadServerConfig({ ...base, LLM_TOTAL_CAP_USD: "-1" })).toThrow("LLM_TOTAL_CAP_USD");
+    expect(() => loadServerConfig({ ...base, LLM_TOTAL_CAP_USD: "lots" })).toThrow("LLM_TOTAL_CAP_USD");
+  });
+
   test("MODEL_TIMEOUT_MS and PORT must be finite positive integers", async () => {
     const base = { JWT_SECRET: "x".repeat(32) };
     expect(() => loadServerConfig({ ...base, MODEL_TIMEOUT_MS: "0" })).toThrow("MODEL_TIMEOUT_MS");

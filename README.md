@@ -188,9 +188,22 @@ bun run web:build      # web/dist, served by the API server at / (single contain
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |
 | `GET /api/trace/:session` | Spans for the trace view (agent, or the session itself) |
 
-Optional env: `DATABASE_URL`, `PGLITE_DIR`, `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH` (for `publish`).
+Optional env: `DATABASE_URL`, `PGLITE_DIR`, `ROUTER` (`auto` default, `keyword`, `embed-lr`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `MODEL_TIMEOUT_MS`, `SAFE_MODE=1`, `PORT`, `DEMO_PIN`, `AGENT_PIN`, `SERVING_PATH` (for `publish`), `LLM_TOTAL_CAP_USD` (default `3`: hard cap on total project LLM spend; calls that could cross it are refused with `BUD_TOTAL` and the turn falls back to templates or a handoff).
 
 **Limits:** sessions, checkpoints, disputes, the handoff queue, audit log and spans live in Postgres and survive restarts. Single-use nonces and the audit hash chain are safe across instances (atomic update, advisory lock). The per-session turn lock and the provider circuit breaker (`server/graph/turn.ts`, `server/gates/budget.ts`) are still in-process, so run a single instance or session-sticky routing until they move to Postgres advisory locks / Redis. `DEMO_PIN` and `AGENT_PIN` default to `2468`/`1357` for the demo only and must be overridden in any shared deployment.
+
+### Train the intent router
+
+Latest run (`reports/router.md`): keyword baseline macro-F1 0.631, embeddings + logistic regression 0.975 (selected; deployed threshold 0.60), Gemini zero-shot 1.000 (not deployable: it would add a fourth model call per turn). Both trained/zero-shot scores are near ceiling on a clean, hand-written test set written by the same author as the seeds (113 near-duplicate training rows were dropped); expect lower accuracy on real traffic, which plan 5 measures end to end. Total cost of data generation and training: about USD 0.19.
+
+```bash
+bun run ml:generate   # seeds + Gemini paraphrases → ml/data/router-train.jsonl (~$0.15)
+bun run train         # keyword vs Gemini zero-shot vs embeddings + logistic regression → reports/router.md (~$0.15–0.45; zero-shot dominates; capped by ML_RUN_LIMIT_USD)
+```
+
+The test set (`ml/data/router-test.csv`, 237 hand-written ES/PT utterances) is frozen by hash before any model selection; training data is team-generated (hand-written seeds in `ml/data/router-seeds.csv` expanded by Gemini) and labeled as synthetic. `bun run train` writes `experiments/<run_id>.json`, `reports/router.md`, `ml/models/router-embed-lr.json` and `ml/models/router-selection.json`; the server's `ROUTER=auto` (default) follows that selection, `ROUTER=keyword|embed-lr` overrides it. Both scripts respect the project spend cap plus `ML_RUN_LIMIT_USD` (default `0.5`) per run; embeddings are cached in `data/ml-cache/`, and `ml:generate`'s paraphrases are cached there too, per seed family, so an interrupted or failed run resumes without re-paying for families already generated.
+
+At runtime, the router's embedding calls are not chat calls: they bypass per-turn call counters and session/daily chat budgets, and are metered only by the project spend ledger (`LLM_TOTAL_CAP_USD`). Each router embedding costs about USD 0.000002.
 
 Pipeline outputs:
 - `data/serving.sqlite`: customer subset and demo personas, published to Postgres with `bun run publish` (not committed).
@@ -208,7 +221,7 @@ Serving contract (`serving.sqlite` and the Postgres `serving` schema read by the
 | 2a | Core domain: auth, tools, policy, gates | done |
 | 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
 | 2c | Postgres / Supabase for runtime state and serving data | done |
-| 3 | Intent router: dataset, four-way comparison, calibration | planned |
+| 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
 | 4 | Web UI: chat, agent console, trace viewer | done |
 | 5 | Evaluation harness and red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |

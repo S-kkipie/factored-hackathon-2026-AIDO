@@ -1,0 +1,238 @@
+id,lang,variant,label,text
+T001,es,MX,check_balance,¿Cuánto dinero tengo en mi cuenta?
+T002,es,MX,check_balance,oye cuánta lana me queda en la tarjeta de débito
+T003,es,MX,check_balance,Quiero saber el saldo disponible de mi tarjeta de crédito
+T004,es,MX,check_balance,cuanto llevo gastado de mi linea de credito
+T005,es,CO,check_balance,¿Me puede decir cuánta plata tengo disponible?
+T006,es,CO,check_balance,Necesito consultar el saldo de mi cuenta de ahorros por favor
+T007,es,CO,check_balance,cuanto cupo me queda en la tarjeta
+T008,es,CO,check_balance,"Buenas, ¿cuál es el saldo de todas mis cuentas?"
+T009,es,AR,check_balance,"che, ¿cuánta plata tengo en la caja de ahorro?"
+T010,es,AR,check_balance,Necesito saber cuánto me queda disponible en la tarjeta
+T011,es,AR,check_balance,¿Qué saldo tiene mi cuenta corriente hoy?
+T012,es,AR,check_balance,cuanto debo en total de la tarjeta de credito
+T013,es,MX,check_balance,me puedes decir mi saldo plis
+T014,es,CO,check_balance,¿Cuánto debo todavía del préstamo personal?
+T015,es,AR,check_balance,Quisiera ver el disponible de mi cuenta
+T016,es,MX,check_balance,"Hola, ¿cuánto tengo?"
+T017,es,MX,check_balance,ya me pagaron? quiero ver si me cayó el depósito en el saldo
+T018,es,MX,list_transactions,Muéstrame mis últimos movimientos
+T019,es,MX,list_transactions,¿Qué compras hice la semana pasada?
+T020,es,MX,list_transactions,quiero ver todo lo que gasté en Oxxo este mes
+T021,es,MX,list_transactions,Dame la lista de cargos de junio de mi tarjeta
+T022,es,CO,list_transactions,¿Me puede mostrar las transacciones de los últimos 30 días?
+T023,es,CO,list_transactions,necesito el historial de pagos que hice en Rappi
+T024,es,CO,list_transactions,Muéstreme los retiros que hice en cajero este mes
+T025,es,CO,list_transactions,¿Cuáles fueron mis gastos más grandes de mayo?
+T026,es,AR,list_transactions,"che, pasame los últimos consumos de la tarjeta"
+T027,es,AR,list_transactions,Quiero ver los movimientos de mi cuenta entre el 1 y el 15 de junio
+T028,es,AR,list_transactions,¿Qué pagos hice en Mercado Libre?
+T029,es,AR,list_transactions,mostrame las compras de más de 100 dólares
+T030,es,MX,list_transactions,"en que me gaste la quincena, quiero ver mis gastos"
+T031,es,CO,list_transactions,"Listado de todas las compras con tarjeta de crédito, por favor"
+T032,es,AR,list_transactions,necesito un resumen de lo que gasté en supermercados
+T033,es,MX,list_transactions,¿Cuántas veces pagué Netflix este año?
+T034,es,CO,list_transactions,Quiero revisar los movimientos de ayer
+T035,es,MX,explain_charge,¿Qué es este cargo de 45 dólares que me aparece?
+T036,es,MX,explain_charge,"me aparece un cobro de ""AMZN Mktp"" y no sé qué es"
+T037,es,MX,explain_charge,¿Por qué tengo un cargo pendiente de Uber?
+T038,es,MX,explain_charge,Explíqueme el movimiento del 10 de junio en Super Ahorro
+T039,es,CO,explain_charge,¿A qué corresponde el cobro que dice PAYU*COMPRA?
+T040,es,CO,explain_charge,"Tengo una transacción rechazada de ayer, ¿qué pasó?"
+T041,es,CO,explain_charge,¿Por qué me aparece una compra como revertida?
+T042,es,CO,explain_charge,qué significa el cargo de 12 dólares en mi estado de cuenta
+T043,es,AR,explain_charge,¿Qué es este débito de Spotify que me figura?
+T044,es,AR,explain_charge,me salió un consumo en dólares que no entiendo de dónde es
+T045,es,AR,explain_charge,¿De dónde viene el cargo de la estación de servicio del sábado?
+T046,es,AR,explain_charge,Quiero entender un cobro que me hicieron en el exterior
+T047,es,MX,explain_charge,¿Por qué el cargo de la farmacia sigue pendiente?
+T048,es,CO,explain_charge,me explica por favor un cargo raro de 3.99 en la app store
+T049,es,AR,explain_charge,¿Ese movimiento de 250 que me aparece es de la cuota del gimnasio?
+T050,es,MX,explain_charge,"vi un cargo de Mercado Pago, ¿de qué es?"
+T051,es,CO,explain_charge,¿Qué canal se usó para la compra del 5 de junio?
+T052,es,MX,dispute_charge,No reconozco un cargo de 89 dólares en mi tarjeta
+T053,es,MX,dispute_charge,Me cobraron dos veces la misma compra en Walmart
+T054,es,MX,dispute_charge,Quiero disputar un cargo que yo no hice
+T055,es,MX,dispute_charge,"ese cobro de Uber no fui yo, quiero reclamarlo"
+T056,es,CO,dispute_charge,Me cobraron un valor diferente al que pagué en el restaurante
+T057,es,CO,dispute_charge,"Hay una compra en mi tarjeta que no autoricé, quiero que la revisen"
+T058,es,CO,dispute_charge,me hicieron un cobro indebido de 40 dólares
+T059,es,CO,dispute_charge,Quiero desconocer la transacción TRX-A1SMALL000000000001
+T060,es,AR,dispute_charge,"Che, me debitaron dos veces la cuota del gimnasio, quiero reclamar"
+T061,es,AR,dispute_charge,"Hay un consumo que no hice en una página de juegos, quiero desconocerlo"
+T062,es,AR,dispute_charge,"Me cobraron 30 dólares de más en la nafta, quiero hacer el reclamo"
+T063,es,AR,dispute_charge,No reconozco dos compras de anoche en la tarjeta
+T064,es,MX,dispute_charge,"alguien usó mi tarjeta para comprar en una tienda en línea, no fui yo"
+T065,es,CO,dispute_charge,Quiero abrir una disputa por un cargo duplicado de Netflix
+T066,es,AR,dispute_charge,"me cobraron un monto incorrecto, pagué 20 y me figura 200"
+T067,es,MX,dispute_charge,quiero que me quiten un cargo que no reconozco
+T068,es,CO,dispute_charge,desconozco el cobro de la estación de servicio del domingo
+T069,es,MX,request_human,Quiero hablar con un agente
+T070,es,MX,request_human,pásame con una persona de verdad por favor
+T071,es,MX,request_human,¿Me puede atender un ejecutivo?
+T072,es,CO,request_human,Necesito hablar con un asesor humano
+T073,es,CO,request_human,"no quiero hablar con un robot, comuníqueme con alguien"
+T074,es,CO,request_human,¿Hay alguien del banco con quien pueda hablar?
+T075,es,AR,request_human,"Che, ¿me pasás con un operador?"
+T076,es,AR,request_human,"Quiero que me atienda una persona, no un bot"
+T077,es,AR,request_human,necesito hablar con alguien de atención al cliente ya
+T078,es,MX,request_human,transfiéreme con un humano
+T079,es,CO,request_human,"Por favor, un agente, esto es urgente"
+T080,es,AR,request_human,¿Puedo hablar con un supervisor?
+T081,es,MX,request_human,"ya me cansé, quiero un asesor"
+T082,es,CO,request_human,quiero que un funcionario del banco revise mi caso
+T083,es,AR,request_human,Pasame con alguien que me pueda ayudar de verdad
+T084,es,MX,request_human,agente
+T085,es,CO,request_human,"¿Me comunica con servicio al cliente, por favor?"
+T086,es,MX,out_of_scope,Quiero pedir un préstamo personal
+T087,es,MX,out_of_scope,¿Cómo aumento el límite de mi tarjeta de crédito?
+T088,es,MX,out_of_scope,La app no me deja iniciar sesión
+T089,es,MX,out_of_scope,¿A qué hora abre la sucursal de Polanco?
+T090,es,CO,out_of_scope,Quiero abrir una cuenta de ahorros nueva
+T091,es,CO,out_of_scope,"Perdí mi tarjeta, necesito bloquearla"
+T092,es,CO,out_of_scope,¿Qué tasa de interés tienen los CDT?
+T093,es,CO,out_of_scope,Necesito hacer una transferencia a otra cuenta
+T094,es,AR,out_of_scope,¿Me pueden dar un plazo fijo?
+T095,es,AR,out_of_scope,Olvidé mi contraseña de home banking
+T096,es,AR,out_of_scope,¿Cómo cambio mi dirección registrada?
+T097,es,AR,out_of_scope,Quiero contratar un seguro de auto
+T098,es,MX,out_of_scope,¿Cuál es el tipo de cambio del dólar hoy?
+T099,es,CO,out_of_scope,¿Me pueden devolver la plata de la compra ya mismo?
+T100,es,AR,out_of_scope,¿Qué opinan de invertir en cripto?
+T101,es,MX,out_of_scope,quiero una tarjeta adicional para mi esposa
+T102,es,CO,out_of_scope,¿Cuál es el clima en Bogotá mañana?
+T103,es,MX,greeting,Hola
+T104,es,MX,greeting,Buenos días
+T105,es,MX,greeting,gracias
+T106,es,CO,greeting,Buenas tardes
+T107,es,CO,greeting,Muchas gracias
+T108,es,CO,greeting,"Hola, buenas"
+T109,es,AR,greeting,Hola che
+T110,es,AR,greeting,Buenas noches
+T111,es,AR,greeting,"Gracias, muy amable"
+T112,es,MX,greeting,qué onda
+T113,es,CO,greeting,Mil gracias
+T114,es,AR,greeting,"Listo, gracias"
+T115,es,MX,greeting,"ok gracias, eso era todo"
+T116,es,CO,greeting,Buen día
+T117,es,AR,greeting,"hola, ¿cómo estás?"
+T118,es,MX,greeting,"perfecto, muchas gracias por la ayuda"
+T119,pt,BR,check_balance,Qual é o meu saldo?
+T120,pt,BR,check_balance,quanto dinheiro eu tenho na conta corrente?
+T121,pt,BR,check_balance,Quero saber o limite disponível do meu cartão de crédito
+T122,pt,BR,check_balance,quanto tá sobrando na minha conta poupança
+T123,pt,BR,check_balance,Pode me mostrar o saldo de todas as minhas contas?
+T124,pt,BR,check_balance,quanto eu devo no cartão?
+T125,pt,BR,check_balance,Quanto ainda falta pagar do empréstimo pessoal?
+T126,pt,BR,check_balance,me fala quanto tenho de grana disponível
+T127,pt,BR,check_balance,Qual o saldo do cartão de débito hoje?
+T128,pt,BR,check_balance,meu salário já caiu? quero ver o saldo
+T129,pt,BR,check_balance,"Oi, quanto eu tenho?"
+T130,pt,BR,check_balance,"Consultar saldo, por favor"
+T131,pt,BR,check_balance,quanto de limite eu ainda tenho pra usar
+T132,pt,BR,check_balance,Gostaria de verificar o saldo atual da minha conta
+T133,pt,BR,check_balance,qto tenho na conta
+T134,pt,BR,check_balance,"quanto eu tenho na conta, mano?"
+T135,pt,BR,check_balance,"tô sem saber quanto sobrou, me mostra o saldo"
+T136,pt,BR,list_transactions,Quero ver meu extrato
+T137,pt,BR,list_transactions,Mostra as minhas últimas compras no cartão
+T138,pt,BR,list_transactions,Quais foram meus gastos no iFood este mês?
+T139,pt,BR,list_transactions,Me mostra as movimentações dos últimos 7 dias
+T140,pt,BR,list_transactions,preciso do histórico de transações de maio
+T141,pt,BR,list_transactions,Quais saques eu fiz no caixa eletrônico em junho?
+T142,pt,BR,list_transactions,lista as compras acima de 100 dólares
+T143,pt,BR,list_transactions,Quanto eu gastei com Uber esse mês? Quero ver as corridas
+T144,pt,BR,list_transactions,Pode listar as transações de ontem?
+T145,pt,BR,list_transactions,quero conferir tudo que passei no cartão de crédito
+T146,pt,BR,list_transactions,Me mostra os pagamentos que fiz na Amazon
+T147,pt,BR,list_transactions,Quais foram as maiores despesas da semana passada?
+T148,pt,BR,list_transactions,extrato do mês por favor
+T149,pt,BR,list_transactions,Quero revisar as movimentações entre 1 e 10 de junho
+T150,pt,BR,list_transactions,onde eu gastei meu dinheiro esse mês?
+T151,pt,BR,list_transactions,me manda as últimas transações da conta
+T152,pt,BR,list_transactions,Quantas vezes paguei a Netflix este ano?
+T153,pt,BR,explain_charge,O que é essa cobrança de 45 dólares?
+T154,pt,BR,explain_charge,"apareceu um débito de ""PAG*JOSE"" e não sei o que é"
+T155,pt,BR,explain_charge,Por que tem uma compra pendente da farmácia?
+T156,pt,BR,explain_charge,Me explica a transação do dia 10 de junho no supermercado
+T157,pt,BR,explain_charge,"Tenho uma compra recusada de ontem, o que aconteceu?"
+T158,pt,BR,explain_charge,Por que essa compra aparece como estornada?
+T159,pt,BR,explain_charge,o que significa esse lançamento de 12 dólares no extrato
+T160,pt,BR,explain_charge,De onde vem essa cobrança do Spotify?
+T161,pt,BR,explain_charge,Quero entender uma cobrança feita no exterior
+T162,pt,BR,explain_charge,"que cobrança é essa de 3,99 na loja de apps?"
+T163,pt,BR,explain_charge,Essa compra de 250 é da academia?
+T164,pt,BR,explain_charge,"vi uma cobrança do Mercado Pago, é de quê?"
+T165,pt,BR,explain_charge,Qual canal foi usado na compra do dia 5 de junho?
+T166,pt,BR,explain_charge,Por que a compra no posto ainda está pendente?
+T167,pt,BR,explain_charge,"me aparece um lançamento estranho da Shopee, o que é?"
+T168,pt,BR,explain_charge,Pode explicar esse débito que entrou ontem?
+T169,pt,BR,explain_charge,"não entendi essa transação em dólar, de onde é?"
+T170,pt,BR,dispute_charge,Não reconheço uma compra de 89 dólares no meu cartão
+T171,pt,BR,dispute_charge,Fui cobrado duas vezes pela mesma compra
+T172,pt,BR,dispute_charge,Quero contestar uma cobrança que eu não fiz
+T173,pt,BR,dispute_charge,"essa corrida da Uber não fui eu, quero reclamar"
+T174,pt,BR,dispute_charge,Me cobraram um valor diferente do que paguei no restaurante
+T175,pt,BR,dispute_charge,Tem uma compra no cartão que eu não autorizei
+T176,pt,BR,dispute_charge,fizeram uma cobrança indevida de 40 dólares na minha conta
+T177,pt,BR,dispute_charge,Quero contestar a transação TRX-A1SMALL000000000001
+T178,pt,BR,dispute_charge,Debitaram duas vezes a mensalidade da academia
+T179,pt,BR,dispute_charge,Tem uma compra num site de jogos que eu não fiz
+T180,pt,BR,dispute_charge,"Me cobraram 30 dólares a mais no posto, quero abrir uma reclamação"
+T181,pt,BR,dispute_charge,não reconheço duas compras de ontem à noite
+T182,pt,BR,dispute_charge,"alguém usou meu cartão numa loja online, não fui eu"
+T183,pt,BR,dispute_charge,Quero abrir uma contestação por cobrança duplicada da Netflix
+T184,pt,BR,dispute_charge,"o valor tá errado, paguei 20 e cobraram 200"
+T185,pt,BR,dispute_charge,quero que tirem uma cobrança que eu não reconheço
+T186,pt,BR,dispute_charge,desconheço o débito do posto de domingo
+T187,pt,BR,request_human,Quero falar com um atendente
+T188,pt,BR,request_human,me passa pra uma pessoa de verdade por favor
+T189,pt,BR,request_human,Posso falar com um gerente?
+T190,pt,BR,request_human,Preciso falar com um atendente humano
+T191,pt,BR,request_human,"não quero falar com robô, me transfere pra alguém"
+T192,pt,BR,request_human,Tem alguém do banco que possa me atender?
+T193,pt,BR,request_human,"quero ser atendido por uma pessoa, não um bot"
+T194,pt,BR,request_human,preciso falar com o atendimento ao cliente agora
+T195,pt,BR,request_human,me transfere pra um humano
+T196,pt,BR,request_human,"Por favor, um atendente, é urgente"
+T197,pt,BR,request_human,Posso falar com um supervisor?
+T198,pt,BR,request_human,"cansei, quero um atendente"
+T199,pt,BR,request_human,quero que um funcionário do banco veja meu caso
+T200,pt,BR,request_human,Me coloca em contato com alguém que resolva de verdade
+T201,pt,BR,request_human,atendente
+T202,pt,BR,request_human,Pode me ligar com a central de atendimento?
+T203,pt,BR,request_human,quero falar com gente
+T204,pt,BR,out_of_scope,Quero pedir um empréstimo
+T205,pt,BR,out_of_scope,Como aumento o limite do meu cartão?
+T206,pt,BR,out_of_scope,O aplicativo não está abrindo
+T207,pt,BR,out_of_scope,Que horas abre a agência da Paulista?
+T208,pt,BR,out_of_scope,Quero abrir uma conta nova
+T209,pt,BR,out_of_scope,"Perdi meu cartão, preciso bloquear"
+T210,pt,BR,out_of_scope,Qual a taxa do CDB de vocês?
+T211,pt,BR,out_of_scope,Preciso fazer um pix para minha mãe
+T212,pt,BR,out_of_scope,Esqueci minha senha do internet banking
+T213,pt,BR,out_of_scope,Como atualizo meu endereço cadastrado?
+T214,pt,BR,out_of_scope,Quero contratar um seguro de vida
+T215,pt,BR,out_of_scope,Qual a cotação do dólar hoje?
+T216,pt,BR,out_of_scope,Vocês podem me devolver o dinheiro dessa compra agora?
+T217,pt,BR,out_of_scope,Vale a pena investir em bitcoin?
+T218,pt,BR,out_of_scope,quero um cartão adicional pro meu marido
+T219,pt,BR,out_of_scope,Vai chover em São Paulo amanhã?
+T220,pt,BR,out_of_scope,como faço pra parcelar a fatura?
+T221,pt,BR,greeting,Oi
+T222,pt,BR,greeting,Bom dia
+T223,pt,BR,greeting,obrigado
+T224,pt,BR,greeting,Boa tarde
+T225,pt,BR,greeting,Muito obrigada
+T226,pt,BR,greeting,"Olá, tudo bem?"
+T227,pt,BR,greeting,Boa noite
+T228,pt,BR,greeting,valeu
+T229,pt,BR,greeting,"Obrigado, muito gentil"
+T230,pt,BR,greeting,e aí
+T231,pt,BR,greeting,Brigadão
+T232,pt,BR,greeting,"Beleza, obrigado"
+T233,pt,BR,greeting,"ok obrigado, era só isso"
+T234,pt,BR,greeting,Olá
+T235,pt,BR,greeting,"oi, tudo bom?"
+T236,pt,BR,greeting,"perfeito, obrigada pela ajuda"
+T237,pt,BR,greeting,valeu pela ajuda!
