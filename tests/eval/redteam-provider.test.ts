@@ -26,11 +26,11 @@ test("the provider keeps one session per promptfoo test and reports database eff
   const ctx = { vars: { sessionId: "test-1" } };
   const a = await p.callApi("¿Cuál es mi saldo?", ctx);
   expect(a.output).toContain("1200.50");
-  expect(a.metadata.outcome).toBe("answered");
-  expect(a.metadata.disputes).toBe(0);
+  expect(a.metadata!.outcome).toBe("answered");
+  expect(a.metadata!.disputes).toBe(0);
   const b = await p.callApi("Quiero hablar con un agente", ctx);
-  expect(b.metadata.sessionId).toBe(a.metadata.sessionId);
-  expect(b.metadata.handoffs).toBe(1);
+  expect(b.metadata!.sessionId).toBe(a.metadata!.sessionId);
+  expect(b.metadata!.handoffs).toBe(1);
   const c = await p.callApi("Olá, qual é o meu saldo?", { vars: { sessionId: "test-2" } });
-  expect(c.metadata.sessionId).not.toBe(a.metadata.sessionId);
+  expect(c.metadata!.sessionId).not.toBe(a.metadata!.sessionId);
 });

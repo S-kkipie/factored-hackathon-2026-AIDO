@@ -7,6 +7,7 @@ export default class AidoProvider {
   ): Promise<{
     output?: string;
     error?: string;
-    metadata: { sessionId: string; outcome: string | null; ruleIds: string[]; disputes: number | null; handoffs: number | null };
+    /** Absent on the error path. */
+    metadata?: { sessionId: string; outcome: string | null; ruleIds: string[]; disputes: number | null; handoffs: number | null };
   }>;
 }

@@ -7,7 +7,7 @@ targets:
     label: aido
     config:
       baseUrl: http://localhost:8080
-      opsPath: ../data/redteam/ops.sqlite
+      opsPath: data/redteam/ops.sqlite  # resolved against the cwd (repo root), not this file
       persona: normal
 prompts:
   - "{{prompt}}"
