@@ -33,3 +33,13 @@ test("the report shows both systems, unsafe outcomes with denominators, versions
   expect(md).toContain("dispute_fraud pool wraps");
   expect(md).toContain("## By language");
 });
+
+test("a baseline subset adds a same-scenarios column for the proposed system", () => {
+  const r: EvalResult = {
+    runId: "eval-2", split: "test", scenarioHash: "abc123", createdAt: "2026-10-04T00:00:00Z",
+    versions: { model: "m", prompts: {}, policy: "p", router: "r" },
+    systems: { proposed: [row("proposed", "es", true), row("proposed", "pt", false)], baseline: [row("baseline", "es", true)] },
+    repeats: null, spendUsd: 0, limitUsd: 1, stoppedEarly: false, notes: [],
+  };
+  expect(renderReport(r)).toContain("| Metric | Proposed | Proposed (baseline subset) | Baseline |");
+});

@@ -16,6 +16,18 @@ import type { Scenario } from "./scenario";
 import { createProposedRunner } from "./system";
 import { createWorld } from "./world";
 
+/**
+ * Deterministic stratified subset for the (costlier) baseline: the first ceil(share × n) scenarios of every
+ * family and language, so every category stays represented. share = 1 keeps everything.
+ */
+export function baselineSubset(scenarios: Scenario[], share: number): Scenario[] {
+  if (!(share > 0 && share < 1)) return scenarios;
+  const groups = new Map<string, Scenario[]>();
+  for (const s of scenarios) groups.set(`${s.family}:${s.language}`, [...(groups.get(`${s.family}:${s.language}`) ?? []), s]);
+  const keep = new Set([...groups.values()].flatMap((g) => g.slice(0, Math.ceil(g.length * share)).map((s) => s.id)));
+  return scenarios.filter((s) => keep.has(s.id));
+}
+
 export interface EvalResult {
   runId: string;
   split: "dev" | "test";
@@ -39,6 +51,7 @@ if (import.meta.main) {
       families: { type: "string" },
       repeat: { type: "string", default: "0" },
       "repeat-n": { type: "string", default: "20" },
+      "baseline-share": { type: "string", default: "1" },
       max: { type: "string" },
     },
   });
@@ -88,12 +101,17 @@ if (import.meta.main) {
           })
         : null;
     const rows: Row[] = [];
-    for (const s of scenarios) {
+    for (const s of sys === "baseline" ? baselineSubset(scenarios, Number(values["baseline-share"])) : scenarios) {
       if (over()) {
         result.stoppedEarly = true;
         break;
       }
       const t = sys === "proposed" ? await proposed.run(s) : await baseline!.run(s);
+      // A run-limit refusal means the scenario was not run, not that it failed: stop and leave it out.
+      if (t.error?.startsWith("BUD_TOTAL")) {
+        result.stoppedEarly = true;
+        break;
+      }
       rows.push({ s, t, g: grade(s, t) });
       process.stdout.write(`${sys} ${s.id} ${rows.at(-1)!.g.pass ? "pass" : "FAIL"} $${(ledger.total() - start).toFixed(4)}\n`);
     }

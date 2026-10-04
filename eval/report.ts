@@ -47,6 +47,11 @@ export function renderReport(r: EvalResult): string {
   const systems = (["proposed", "baseline"] as const)
     .filter((k) => r.systems[k])
     .map((k): [string, Row[]] => [k === "proposed" ? "Proposed" : "Baseline", r.systems[k]!]);
+  // When the baseline ran on a subset, also show the proposed system on exactly those scenarios.
+  const baseIds = new Set((r.systems.baseline ?? []).map((row) => row.s.id));
+  if (r.systems.proposed && r.systems.baseline && baseIds.size < r.systems.proposed.length) {
+    systems.splice(1, 0, ["Proposed (baseline subset)", r.systems.proposed.filter((row) => baseIds.has(row.s.id))]);
+  }
   const proposed = r.systems.proposed;
   const proj = proposed ? projection(summarize(proposed).safeAutoResolution) : null;
   const failures = (proposed ?? []).filter((row) => !row.g.pass && row.g.applicable);
