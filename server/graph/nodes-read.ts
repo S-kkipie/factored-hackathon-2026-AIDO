@@ -260,7 +260,11 @@ export const respondNode = (d: GraphDeps) => async (s: TurnValues): Promise<Turn
       const txs = r.transactions?.v ?? [];
       const cites = txs.length === 0 || txs.some((t) => res.value.reply.includes(t.transaction_id));
       if (check.ok && cites) reply = res.value.reply;
-      else rules.push(...check.ruleIds, ...(cites ? [] : (["RS_CITE"] as const)));
+      else {
+        const rejected = [...check.ruleIds, ...(cites ? [] : (["RS_CITE"] as const))];
+        rules.push(...rejected);
+        d.onDraftRejected?.(res.value.reply, [...rejected]);
+      }
       if (check.ruleIds.includes("RS_CANARY")) addRisk(d.ops, d.sessionId, "injectionSignal");
     }
   } catch (e) {

@@ -5,21 +5,36 @@ import { createAuth } from "./auth";
 import { loadServerConfig } from "./config";
 import { openOps } from "./db/ops";
 import { openServing } from "./db/serving";
+import type { ServingDb } from "./db/serving";
 import { CircuitBreaker } from "./gates/budget";
 import { BunSqliteSaver } from "./graph/checkpointer";
 import { createGeminiLlm } from "./llm/gemini";
 import { SpendLedger } from "./llm/ledger";
 import { createGeminiEmbedder } from "./llm/embedder";
 import { RunBudget, meteredEmbedder } from "./llm/metered";
+import type { Llm } from "./llm/types";
 import { createConfiguredRouter } from "./router/select";
 import { createTools } from "./tools";
+import type { Tools } from "./tools";
 
-export function createServer(env: Record<string, string | undefined> = process.env) {
+/** Seams for offline evaluation (eval/); the HTTP entry point below never passes any. */
+export interface ServerOverrides {
+  /** `null` forces template-only mode; absent means Gemini when GEMINI_API_KEY is set. */
+  llm?: Llm | null;
+  wrapServing?: (s: ServingDb) => ServingDb;
+  wrapTools?: (t: Tools) => Tools;
+  /** Clock for JWT issue and verification (ms epoch). */
+  authNow?: () => number;
+  onDraftRejected?: (draft: string, ruleIds: string[]) => void;
+}
+
+export function createServer(env: Record<string, string | undefined> = process.env, o: ServerOverrides = {}) {
   const cfg = loadServerConfig(env);
-  const serving = openServing(cfg.servingPath);
+  const base = openServing(cfg.servingPath);
+  const serving = o.wrapServing ? o.wrapServing(base) : base;
   const ops = openOps(cfg.opsPath);
-  const auth = createAuth(cfg, serving, ops);
-  const llm = cfg.geminiApiKey ? createGeminiLlm(cfg.geminiApiKey, cfg.geminiModel) : null;
+  const auth = createAuth(cfg, serving, ops, o.authNow);
+  const llm = o.llm !== undefined ? o.llm : cfg.geminiApiKey ? createGeminiLlm(cfg.geminiApiKey, cfg.geminiModel) : null;
   const ledger = new SpendLedger(cfg.spendLedgerPath, cfg.llmTotalCapUsd);
   // Router embeddings are metered against the same project cap (LLM_TOTAL_CAP_USD); SAFE_MODE disables every model call.
   // The run limit is set to the project cap on purpose: the router is not a chat call and bypasses per-turn and session/daily budgets.
@@ -35,11 +50,12 @@ export function createServer(env: Record<string, string | undefined> = process.e
     embedder,
     unavailableReason,
   });
+  const tools = createTools(serving, ops);
   const app = createApp({
     cfg,
     serving,
     ops,
-    tools: createTools(serving, ops),
+    tools: o.wrapTools ? o.wrapTools(tools) : tools,
     auth,
     router: routing.router,
     llm,
@@ -47,8 +63,9 @@ export function createServer(env: Record<string, string | undefined> = process.e
     checkpointer: new BunSqliteSaver(ops),
     ledger,
     webDir: cfg.webDir,
+    onDraftRejected: o.onDraftRejected,
   });
-  return { cfg, app, llm, ledger, routing };
+  return { cfg, app, llm, ledger, routing, ops, serving };
 }
 
 if (import.meta.main) {

@@ -26,6 +26,8 @@ export interface GraphDeps {
   canary: string;
   /** Simulated policy clock (YYYY-MM-DD) used to resolve relative dates in slot extraction. */
   today: string;
+  /** Offline-evaluation debug seam: receives model drafts the response gate rejected. Never set by the HTTP server. */
+  onDraftRejected?: (draft: string, ruleIds: string[]) => void;
 }
 
 /** Nodes audit decisions only: rule ids, labels, ids and counts. Never raw text or PII (gates and tools write nothing). */

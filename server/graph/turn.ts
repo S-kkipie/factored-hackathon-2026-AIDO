@@ -38,6 +38,8 @@ export interface TurnDeps {
   /** Project-wide LLM spend cap; absent in tests that do not exercise it. */
   ledger?: SpendLedger;
   now?: () => Date;
+  /** Offline-evaluation debug seam: receives model drafts the response gate rejected. Never set by the HTTP server. */
+  onDraftRejected?: (draft: string, ruleIds: string[]) => void;
 }
 
 export type TurnOutcome = Outcome | "confirm" | "blocked" | "handed_off" | "confirmation_invalid";
@@ -78,6 +80,7 @@ function graphFor(deps: TurnDeps, session: CustomerSession, turn: number, now: D
     tracer,
     canary: canaryFor(deps.cfg.canarySecret, session.sessionId),
     today: POLICY.clock,
+    onDraftRejected: deps.onDraftRejected,
     gateway: createGateway({
       llm: deps.llm,
       ops: deps.ops,
