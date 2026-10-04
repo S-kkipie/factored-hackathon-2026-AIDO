@@ -109,6 +109,10 @@ export async function* drive(
 ): AsyncGenerator<TurnEvent> {
   const cfg = threadOf(sessionId);
   let pending: { id: string; value: ConfirmInterrupt } | null = null;
+  // Every state field is last-value, so the updates streamed by this run are the authoritative result of the
+  // turn. The post-run snapshot only fills fields this run did not write: a stale or misordered latest-checkpoint
+  // read (seen once in evaluation) must never turn a completed handoff into an empty "clarify".
+  const written: Partial<TurnValues> = {};
   for await (const chunk of await app.stream(input, { ...cfg, streamMode: "updates" })) {
     for (const [node, update] of Object.entries(chunk as Record<string, unknown>)) {
       if (node === "__interrupt__") {
@@ -118,12 +122,13 @@ export async function* drive(
       }
       yield { type: "step", name: node };
       const u = (update ?? {}) as Partial<TurnValues>;
+      Object.assign(written, u);
       if (u.route) yield { type: "route", label: u.route.label, confidence: u.route.confidence };
       if (u.decision) yield { type: "decision", action: u.decision.action, ruleIds: [...u.decision.ruleIds] };
     }
   }
 
-  const values = (await app.getState(cfg)).values as TurnValues;
+  const values = { ...((await app.getState(cfg)).values as TurnValues), ...written } as TurnValues;
   if (pending) {
     const nonce = issueNonce(deps.ops, { sessionId, interruptId: pending.id, payload: pending.value.payload }, nowMs, NONCE_TTL_MS);
     appendAudit(deps.ops, { sessionId, kind: "confirm_requested", payload: { interruptId: pending.id, ...pending.value.payload } });
@@ -137,7 +142,9 @@ export async function* drive(
     yield { type: "done", outcome: "confirm", ruleIds: values.ruleIds };
     return;
   }
-  yield { type: "message", text: values.reply };
+  // Never send an empty message: a turn that produced no reply is answered with the clarify template.
+  const text = values.reply.trim().length > 0 ? values.reply : render("clarify_intent", values.language ?? "es");
+  yield { type: "message", text };
   // A graph that ended without ever setting an outcome is not a success; default to a safe clarify, not answered.
   const outcome = values.outcome ?? "clarify";
   const caseId = outcome === "dispute_created" ? values.results.dispute?.v.dispute_id : undefined;
