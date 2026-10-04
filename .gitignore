@@ -14,6 +14,7 @@ docs/*
 !docs/screenshots/
 !docs/architecture.html
 !docs/deploy.md
+!docs/handoff-deploy.md
 .playwright-mcp/
 .superpowers/
 reports/eval-dev.md
