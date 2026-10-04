@@ -2,7 +2,8 @@ export interface PromptInspector {
   inspect(text: string): Promise<{ flagged: boolean; detail: string }>;
 }
 
-const RANK: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 };
+// Model Armor's API returns confidenceLevel as LOW_AND_ABOVE / MEDIUM_AND_ABOVE / HIGH; LOW/MEDIUM are kept for robustness.
+const RANK: Record<string, number> = { LOW_AND_ABOVE: 1, MEDIUM_AND_ABOVE: 2, HIGH: 3, LOW: 1, MEDIUM: 2 };
 const THRESHOLD = { LOW_AND_ABOVE: 1, MEDIUM_AND_ABOVE: 2, HIGH: 3 } as const;
 
 /** Access token from the Cloud Run / GCE metadata server (the service account the service runs as). */

@@ -3,7 +3,7 @@ node_modules
 .worktrees
 .superpowers
 .playwright-mcp
-.env
+.env*
 # The real dataset lives outside the build context and is never added to it; serving.sqlite is copied
 # into the image from the `servingdata` additional build context instead (see Dockerfile and the
 # `docker:build` script in package.json). Ignoring the whole directory also keeps the `data` symlink

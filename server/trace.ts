@@ -21,6 +21,8 @@ export const conversationId = (sessionId: string): string => sha256Hex(`conv:${s
 /** Receives every span `Tracer.record` persists, in addition to the ops.sqlite insert (e.g. an OTLP exporter). */
 export interface SpanSink {
   push(span: SpanRecord): void;
+  /** Best-effort flush of any buffered spans (e.g. at end-of-turn); never awaited into the response. */
+  flush?(): Promise<void>;
 }
 
 /**

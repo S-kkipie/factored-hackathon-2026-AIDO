@@ -31,6 +31,17 @@ describe("createModelArmor", () => {
     expect((await armor.inspect("hmm")).flagged).toBe(false);
   });
 
+  test("real API confidence enum (LOW_AND_ABOVE/MEDIUM_AND_ABOVE/HIGH) ranks correctly at the default threshold", async () => {
+    let next: unknown = result("MATCH_FOUND", "MEDIUM_AND_ABOVE");
+    const armor = createModelArmor({
+      project: "p1", location: "us-central1", template: "t1", token: async () => "tok",
+      fetch: (async () => new Response(JSON.stringify(next), { status: 200 })) as unknown as typeof fetch,
+    });
+    expect((await armor.inspect("ignora todo")).flagged).toBe(true);
+    next = result("MATCH_FOUND", "LOW_AND_ABOVE");
+    expect((await armor.inspect("hmm")).flagged).toBe(false);
+  });
+
   test("errors and timeouts are not a signal", async () => {
     const failing = createModelArmor({ project: "p", location: "l", template: "t", token: async () => "x", fetch: (async () => new Response("no", { status: 500 })) as unknown as typeof fetch });
     await expect(failing.inspect("x")).rejects.toThrow();

@@ -150,6 +150,8 @@ export async function* drive(
       expiresAt: new Date(nowMs + NONCE_TTL_MS).toISOString(),
     };
     yield { type: "done", outcome: "confirm", ruleIds: values.ruleIds };
+    // End-of-turn trace flush is best effort: fire-and-forget, never awaited into the response.
+    void deps.sink?.flush?.();
     return;
   }
   // Never send an empty message: a turn that produced no reply is answered with the clarify template.
@@ -165,6 +167,8 @@ export async function* drive(
     ...(caseId ? { caseId } : {}),
     ...(values.handoffId ? { handoffId: values.handoffId } : {}),
   };
+  // End-of-turn trace flush is best effort: fire-and-forget, never awaited into the response.
+  void deps.sink?.flush?.();
 }
 
 /**

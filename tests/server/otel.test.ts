@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createOtlpExporter, toOtlpJson } from "../../server/otel";
 import { Tracer, type SpanRecord } from "../../server/trace";
+import { harness } from "./graph-harness";
 import { makeOps } from "./fixtures";
 
 const span = (p: Partial<SpanRecord> = {}): SpanRecord => ({
@@ -74,5 +75,22 @@ describe("createOtlpExporter", () => {
     expect(pushed.length).toBe(1);
     expect(pushed[0]!.name).toBe("bank.node.greet");
     expect(pushed[0]!.attributes["gen_ai.conversation.id"]).toBeTruthy();
+  });
+});
+
+describe("end-of-turn flush", () => {
+  test("a completed turn triggers a best-effort flush on the span sink", async () => {
+    const h = await harness();
+    let flushed = 0;
+    h.deps.sink = { push: () => {}, flush: async () => { flushed += 1; } };
+    await h.send("Hola");
+    expect(flushed).toBe(1);
+  });
+
+  test("a sink without flush() does not break the turn", async () => {
+    const h = await harness();
+    h.deps.sink = { push: () => {} };
+    const events = await h.send("Hola");
+    expect(events.length).toBeGreaterThan(0);
   });
 });

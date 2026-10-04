@@ -76,7 +76,10 @@ export function createServer(env: Record<string, string | undefined> = process.e
 if (import.meta.main) {
   const { cfg, app, llm, ledger, routing, sink } = createServer();
   app.listen(cfg.port);
-  process.on("SIGTERM", () => void sink?.shutdown().finally(() => process.exit(0)));
+  process.on("SIGTERM", async () => {
+    await sink?.shutdown();
+    process.exit(0);
+  });
   console.log(
     `AIDO server on :${cfg.port} · model ${llm ? cfg.geminiModel : "none (templates + escalation only)"}${cfg.safeMode ? " · SAFE_MODE" : ""} · router ${routing.router.name} (${routing.reason}) · LLM spend $${ledger.total().toFixed(4)} of $${ledger.capUsd}${sink ? " · traces → Langfuse" : ""}${cfg.modelArmor ? " · Model Armor" : ""}`,
   );

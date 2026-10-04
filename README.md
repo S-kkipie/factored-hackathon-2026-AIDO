@@ -291,6 +291,11 @@ the commands it would run without executing anything:
 bun run deploy -- --project P --region R --langfuse --model-armor-template aido-pi
 ```
 
+The in-app spend cap (`LLM_TOTAL_CAP_USD`) only bounds spend per container instance
+lifetime (its ledger resets on every cold start); for a real hard limit, cap the
+Gemini API key's own quota in the Cloud console instead — see "Operations notes" in
+[`docs/deploy.md`](docs/deploy.md).
+
 ## Documentation
 
 - Design spec: [`docs/superpowers/specs/2026-10-02-banking-cs-system-design.md`](docs/superpowers/specs/2026-10-02-banking-cs-system-design.md)

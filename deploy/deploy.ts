@@ -10,8 +10,12 @@ export interface DeployOptions {
   /** Absolute path to the directory containing serving.sqlite, passed to docker as the `servingdata` build context (see docker:build in package.json and the Dockerfile). */
   dataDir: string;
   langfuse: boolean;
+  /** US-region Langfuse projects need this set; the Langfuse default ingestion endpoint is the EU region. */
+  langfuseBaseUrl?: string;
   modelArmor: { location: string; template: string } | null;
   capUsd: number;
+  /** Dedicated runtime service account (not the Compute Engine default SA); see docs/deploy.md one-time setup. */
+  serviceAccount: string;
 }
 
 /** Secret Manager names → env vars. Values live only in Secret Manager; this script never reads them. */
@@ -34,9 +38,12 @@ export function deployCommands(o: DeployOptions): string[][] {
     `LLM_TOTAL_CAP_USD=${o.capUsd}`,
     "DEPLOY_ENV=cloud-run",
     ...(o.modelArmor ? [`MODEL_ARMOR_PROJECT=${o.project}`, `MODEL_ARMOR_LOCATION=${o.modelArmor.location}`, `MODEL_ARMOR_TEMPLATE=${o.modelArmor.template}`] : []),
+    ...(o.langfuseBaseUrl ? [`LANGFUSE_BASE_URL=${o.langfuseBaseUrl}`] : []),
   ].join(",");
   return [
-    ["docker", "build", "--build-context", `servingdata=${o.dataDir}`, "-t", image, "."],
+    // --platform linux/amd64 pins the build target (Cloud Run only runs amd64); also makes the image build
+    // reproducibly from an Apple Silicon workstation.
+    ["docker", "build", "--platform", "linux/amd64", "--build-context", `servingdata=${o.dataDir}`, "-t", image, "."],
     ["docker", "push", image],
     [
       "gcloud", "run", "deploy", o.service,
@@ -44,6 +51,7 @@ export function deployCommands(o: DeployOptions): string[][] {
       "--project", o.project,
       "--region", o.region,
       "--platform", "managed",
+      "--service-account", o.serviceAccount,
       "--allow-unauthenticated",
       "--max-instances", "1",
       "--min-instances", "0",
@@ -66,9 +74,11 @@ if (import.meta.main) {
       tag: { type: "string" },
       "data-dir": { type: "string" },
       langfuse: { type: "boolean", default: false },
+      "langfuse-base-url": { type: "string" },
       "model-armor-template": { type: "string" },
       "model-armor-location": { type: "string" },
       "cap-usd": { type: "string", default: "3" },
+      "service-account": { type: "string" },
       execute: { type: "boolean", default: false },
     },
   });
@@ -83,8 +93,10 @@ if (import.meta.main) {
     tag,
     dataDir,
     langfuse: values.langfuse!,
+    langfuseBaseUrl: values["langfuse-base-url"],
     modelArmor: values["model-armor-template"] ? { template: values["model-armor-template"], location: values["model-armor-location"] ?? values.region! } : null,
     capUsd: Number(values["cap-usd"]),
+    serviceAccount: values["service-account"] ?? `aido-runtime@${values.project}.iam.gserviceaccount.com`,
   });
   for (const cmd of cmds) {
     console.log(`$ ${cmd.map((a) => (/[\s,=]/.test(a) ? `'${a}'` : a)).join(" ")}`);
