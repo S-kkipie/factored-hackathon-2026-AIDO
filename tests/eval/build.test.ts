@@ -13,13 +13,15 @@ function db() {
     insert into products values ('PRD-D1', 'CLI-DDDDDDDDDDDD', 'Cuenta Corriente', '****3333', 'USD', 321.5, null, 'Active', 'p.csv', 'L1');
     insert into transactions values ('TRX-D1CLEAN000000000007', '2026-06-05T10:00:00', 'PRD-D1', 'CLI-DDDDDDDDDDDD', 'Purchase', 'Food',
       80, 'USD', 80, 'POS', 'Panadería Sol', 'Food', 'México', 'CDMX', 'Approved', '00', 2, 't.csv', 'L1');
+    insert into transactions values ('TRX-D2NULLFRAUD0000000008', '2026-06-06T10:00:00', 'PRD-D1', 'CLI-DDDDDDDDDDDD', 'Purchase', 'Food',
+      60, 'USD', 60, 'POS', 'Kiosko Norte', 'Food', 'México', 'CDMX', 'Approved', '00', null, 't.csv', 'L1');
   `);
   w.close();
   return new Database(path, { readonly: true });
 }
 
 describe("selectors", () => {
-  test("auto-disputable picks only clean, in-window, unique-merchant, small, low-fraud approved transactions", () => {
+  test("auto-disputable picks only clean, in-window, unique-merchant, small, low-fraud approved transactions (a null fraud score fails closed, as in the policy)", () => {
     const ids = SELECTORS.autoDisputable(db()).map((p) => p.tx!.transaction_id);
     expect(ids).toEqual(["TRX-D1CLEAN000000000007"]);
   });

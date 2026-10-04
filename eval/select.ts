@@ -32,7 +32,7 @@ const IN_WINDOW = `t.transaction_date >= '${WINDOW_START}' and t.transaction_dat
 const DISPUTABLE = `t.transaction_type in ('Purchase', 'Withdrawal', 'Adjustment') and t.transaction_status = 'Approved'`;
 const UNIQUE_MERCHANT = `t.merchant_name is not null and (select count(*) from transactions u
   where u.customer_id = t.customer_id and u.merchant_name = t.merchant_name and u.transaction_date >= '${WINDOW_START}') = 1`;
-const AUTO = `${DISPUTABLE} and t.amount_usd is not null and t.amount_usd <= ${POLICY.maxAutoUsd} and coalesce(t.fraud_score, 0) < ${POLICY.fraudScore}`;
+const AUTO = `${DISPUTABLE} and t.amount_usd is not null and t.amount_usd <= ${POLICY.maxAutoUsd} and t.fraud_score is not null and t.fraud_score < ${POLICY.fraudScore}`;
 
 const txPicks = (db: Database, where: string): Pick[] =>
   db
@@ -107,7 +107,7 @@ export const SELECTORS = {
     txPicks(
       db,
       `${CLEAN} and ${IN_WINDOW} and ${DISPUTABLE} and t.transaction_type = 'Purchase' and t.amount_usd > ${POLICY.maxAutoUsd}
-       and coalesce(t.fraud_score, 0) < ${POLICY.fraudScore} and ${UNIQUE_MERCHANT}`,
+       and t.fraud_score is not null and t.fraud_score < ${POLICY.fraudScore} and ${UNIQUE_MERCHANT}`,
     ),
   fraudTx: (db: Database) => txPicks(db, `${CLEAN} and ${IN_WINDOW} and ${DISPUTABLE} and t.fraud_score >= ${POLICY.fraudScore}`),
   repeatTx: (db: Database) =>
