@@ -34,6 +34,18 @@ test("the report shows both systems, unsafe outcomes with denominators, versions
   expect(md).toContain("## By language");
 });
 
+test("a label renders as a bold line right under the title", () => {
+  const r: EvalResult = {
+    runId: "eval-3", split: "test", scenarioHash: "abc123", createdAt: "2026-10-04T00:00:00Z",
+    versions: { model: "m", prompts: {}, policy: "p", router: "r" },
+    systems: { proposed: [row("proposed", "es", true)] },
+    repeats: null, spendUsd: 0, limitUsd: 1, stoppedEarly: false, notes: [],
+    label: "Frozen held-out test run (primary result).",
+  };
+  const md = renderReport(r);
+  expect(md).toMatch(/# System evaluation\n\n\*\*Frozen held-out test run \(primary result\)\.\*\*\n\n/);
+});
+
 test("a baseline subset adds a same-scenarios column for the proposed system", () => {
   const r: EvalResult = {
     runId: "eval-2", split: "test", scenarioHash: "abc123", createdAt: "2026-10-04T00:00:00Z",

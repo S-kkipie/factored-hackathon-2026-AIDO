@@ -82,22 +82,22 @@ The proposed system and a naive baseline replay the same frozen held-out workloa
 - the expected facts in the reply;
 - a cross-customer leak and prompt/canary scan.
 
-**Results** on the frozen test set ([`reports/eval.md`](reports/eval.md); 95% Wilson intervals). The baseline ran on a stratified 60% subset (160 scenarios) to fit the budget, so the proposed column is shown on the same scenarios.
+**Results** on the frozen test set ([`reports/eval.md`](reports/eval.md); 95% Wilson intervals). The baseline ran on a stratified 60% subset (160 scenarios) to fit the budget, so the proposed column is shown on the same scenarios; the baseline itself graded 156 of those (4 session-expiry scenarios do not apply to it). The baseline prompt is not told the policy thresholds, and its tool views omit `fraud_score` and `amount_usd` — naive by the spec's definition, which largely explains its missed escalations.
 
-| Metric | Proposed (same 160) | Baseline (160) |
+| Metric | Proposed (same 160) | Baseline (156 graded) |
 |---|---|---|
 | Pass, all deterministic checks | 95.6% (91.2–97.9) | 58.3% (50.5–65.8) |
 | Safe automated resolution | 97.0% (89.6–99.2) · 64/66 | 71.2% (59.4–80.7) · 47/66 |
-| Missed escalations (must be zero) | 1/32 | 26/32 |
-| Unnecessary escalations | 0/112 | 20/108 |
-| Unsafe outcomes | 1/160 | 31/156 (16 forbidden disputes) |
+| Missed escalations (must be zero) | 1/32 | 22/32 |
+| Unnecessary escalations | 0/112 | 21/108 |
+| Unsafe outcomes | 1/160 | 27/156 (16 forbidden disputes) |
 | Latency per turn p50 / p95 | 1.5 s / 3.4 s | 2.9 s / 6.0 s |
 | Cost per scenario | $0.00043 | $0.00256 |
 
 The run found four defects, all fixed on the dev split or after the test run, with regression tests:
 1. Checkpoint ordering. Under WSL the wall clock stepped back during an LLM call, so a uuid6 checkpoint id sorted before an older one. "Latest" is now the last written checkpoint. This one bug caused both an empty reply after a handoff and a valid dispute confirmation rejected with `TL_NONCE_MISMATCH`.
-2. Merchant search folded case only for ASCII. "Óptica Visión" was never found, which caused the one missed escalation.
-3. The response gate read `4271.5` as 4,271,5.
+2. Merchant search folded case only for ASCII. "Café Ñandú" was never found, which caused the one missed escalation.
+3. The response gate read `1234.5` as 1,234,5.
 4. The model translated "Approved" to "aprovado", which the commitment check flagged.
 
 Model drafts rejected by the response gate went from 7/18 to 0/18 on dev. A post-fix rerun of the proposed system on all 200 test scenarios ([`reports/eval-postfix.md`](reports/eval-postfix.md)) gives 191/200 passing, 0 unsafe outcomes, 0/42 missed escalations and pass^4 = 20/20. The remaining failures are:

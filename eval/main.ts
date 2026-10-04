@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { parseArgs } from "node:util";
 import { ROOT } from "../pipeline/config";
 import { createTools } from "../server/tools";
@@ -40,7 +40,12 @@ export interface EvalResult {
   limitUsd: number;
   stoppedEarly: boolean;
   notes: string[];
+  /** Shown as a bold line under the report title (e.g. to mark a frozen test run vs. a post-fix rerun). */
+  label?: string;
 }
+
+/** Resolves a CLI-supplied path against the repo root, unless it is already absolute. */
+const resolvePath = (p: string): string => (isAbsolute(p) ? p : join(ROOT, p));
 
 if (import.meta.main) {
   const { values } = parseArgs({
@@ -54,8 +59,30 @@ if (import.meta.main) {
       "baseline-share": { type: "string", default: "1" },
       report: { type: "string" },
       max: { type: "string" },
+      regrade: { type: "string" },
+      label: { type: "string" },
     },
   });
+
+  // Offline re-grade: load an already-run EvalResult, recompute every grade from the stored transcript with the
+  // current grading logic, and re-render the report. No server, no model, no spend.
+  if (values.regrade) {
+    const runPath = resolvePath(values.regrade);
+    const result = JSON.parse(readFileSync(runPath, "utf8")) as EvalResult;
+    for (const sys of ["proposed", "baseline"] as const) {
+      const rows = result.systems[sys];
+      if (!rows) continue;
+      for (const row of rows) row.g = grade(row.s, row.t);
+    }
+    // `repeats` stores only grades, not transcripts (spec): nothing to re-derive from, so they are kept as-is.
+    if (values.label) result.label = values.label;
+    if (!values.report) throw new Error("--report is required with --regrade");
+    const reportPath = resolvePath(values.report);
+    writeFileSync(reportPath, renderReport(result));
+    console.log(`regraded ${runPath} -> ${reportPath}`);
+    process.exit(0);
+  }
+
   const split = values.split === "test" ? "test" : "dev";
   if (!values["limit-usd"]) throw new Error("--limit-usd is required (plan 5 total budget: USD 1.20)");
   const limitUsd = Number(values["limit-usd"]);
@@ -81,6 +108,7 @@ if (import.meta.main) {
     split, scenarioHash: hash, createdAt: new Date().toISOString(),
     versions: { model: process.env.GEMINI_MODEL ?? "gemini-3.8-flash", prompts: { ...PROMPT_VERSIONS }, policy: POLICY.version, router: "see server startup (ROUTER=auto)" },
     systems: {}, repeats: null, spendUsd: 0, limitUsd, stoppedEarly: false, notes: [],
+    ...(values.label ? { label: values.label } : {}),
   };
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -134,7 +162,7 @@ if (import.meta.main) {
   writeFileSync(join(ROOT, `data/eval/runs/${result.runId}.json`), JSON.stringify(result, null, 1));
   const md = renderReport(result);
   const reportPath = values.report ?? (split === "test" ? "reports/eval.md" : "reports/eval-dev.md");
-  writeFileSync(join(ROOT, reportPath), md);
+  writeFileSync(resolvePath(reportPath), md);
   console.log(`\n${result.runId}: spend $${result.spendUsd.toFixed(4)} · report ${reportPath}`);
   proposed.close();
 }

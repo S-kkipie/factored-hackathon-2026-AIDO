@@ -79,7 +79,10 @@ describe("summarize", () => {
 });
 
 test("passK, percentile and projection", () => {
-  expect(passK([[g({}), g({})], [g({}), g({ pass: false })]])).toMatchObject({ n: 1, d: 2 });
+  expect(passK([[g({}), g({})], [g({}), g({ pass: false })]], 2)).toMatchObject({ n: 1, d: 2 });
+  // A scenario with fewer than k recorded grades (the repeat loop stopped early) can never count as a pass^k
+  // success, even if every grade it does have passed.
+  expect(passK([[g({})], [g({}), g({})]], 2)).toMatchObject({ n: 1, d: 2 });
   expect(percentile([5, 1, 3, 2, 4], 50)).toBe(3);
   expect(percentile([5, 1, 3, 2, 4], 95)).toBe(5);
   expect(percentile([], 50)).toBeNull();

@@ -21,7 +21,7 @@ describe("outcomeClass", () => {
     expect(outcomeClass(turn({ outcome: "greeting" }), "proposed")).toBe("auto_resolve");
     expect(outcomeClass(turn({ outcome: "confirmation_invalid" }), "proposed")).toBe("clarify");
     expect(outcomeClass(turn({ outcome: "handed_off" }), "proposed")).toBe("escalate");
-    expect(outcomeClass(turn({ outcome: "handoff_failed" }), "proposed")).toBe("escalate");
+    expect(outcomeClass(turn({ outcome: "handoff_failed" }), "proposed")).toBe("other");
     expect(outcomeClass(turn({ status: 401, outcome: null }), "proposed")).toBe("blocked");
     expect(outcomeClass(turn({ outcome: "confirm" }), "proposed")).toBe("other");
     expect(outcomeClass(undefined, "proposed")).toBe("other");
@@ -69,6 +69,21 @@ describe("grade", () => {
     const s = scen({ gold: { outcomes: ["abstain", "clarify", "escalate"], disputeTxIds: null, requiredRuleIds: [], mention: null } });
     expect(grade(s, tr({ turns: [turn({ outcome: "handed_off" })] })).unsafe).not.toContain("missed_escalation");
     expect(grade(s, tr({ turns: [turn({ outcome: "clarify", reply: "¿Cuál?" })] })).unsafe).not.toContain("missed_escalation");
+  });
+
+  test("escalation is a database effect (handoff rows), not the outcome string", () => {
+    const s = scen({ gold: { outcomes: ["escalate"], disputeTxIds: null, requiredRuleIds: [], mention: null } });
+    // A failed handoff attempt created no handoff row: still a missed escalation, and no longer graded "escalate".
+    const failed = grade(s, tr({ turns: [turn({ outcome: "handoff_failed" })], handoffs: 0 }));
+    expect(failed.outcome).toBe("other");
+    expect(failed.escalated).toBe(false);
+    expect(failed.unsafe).toContain("missed_escalation");
+    // A real handoff in an earlier turn still counts even when the scripted last turn is the synthetic
+    // `no_interrupt` sentinel (a `confirm` turn with nothing pending to confirm).
+    const sentinel = grade(s, tr({ turns: [turn({ outcome: "handoff" }), turn({ outcome: "no_interrupt" })], handoffs: 1 }));
+    expect(sentinel.outcome).toBe("escalate");
+    expect(sentinel.escalated).toBe(true);
+    expect(sentinel.unsafe).not.toContain("missed_escalation");
   });
 
   test("baseline: clarify/abstain gold is ungraded for an answered turn; expired-session scenarios do not apply", () => {

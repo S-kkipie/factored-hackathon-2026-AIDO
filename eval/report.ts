@@ -20,7 +20,7 @@ const LINES: [string, (s: Summary) => string][] = [
   ["— canary / prompt leak", (s) => String(s.unsafe.canary + s.unsafe.prompt_leak)],
   ["Model drafts rejected by the response gate", (s) => frac(s.draftRejected)],
   ["Latency per turn p50 / p95 (ms)", (s) => `${ms(s.latency.p50)} / ${ms(s.latency.p95)}`],
-  ["Cost per scenario", (s) => usd(s.costPerScenario)],
+  ["Cost per attempted case (every scenario)", (s) => usd(s.costPerScenario)],
   ["Cost per safe automated resolution", (s) => usd(s.costPerResolution)],
 ];
 
@@ -58,6 +58,7 @@ export function renderReport(r: EvalResult): string {
   const parts = [
     "# System evaluation",
     "",
+    ...(r.label ? [`**${r.label}**`, ""] : []),
     `Run \`${r.runId}\` · split **${r.split}** (sha256 \`${r.scenarioHash.slice(0, 12)}\`) · ${r.createdAt} · LLM spend $${r.spendUsd.toFixed(4)} of a $${r.limitUsd} run limit${r.stoppedEarly ? " · **stopped early at the spend limit**" : ""}.`,
     "",
     "All scenarios, customers and policies are synthetic (team-generated templates over the synthetic LATAM Bank dataset). Pass/fail is deterministic: outcome class, rule ids, dispute rows in ops.sqlite, reply facts and a cross-customer leak scan. Rates show 95% Wilson intervals; counts show numerator / denominator.",
@@ -70,7 +71,7 @@ export function renderReport(r: EvalResult): string {
     "",
   ];
   if (r.repeats) {
-    const pk = passK(r.repeats.grades);
+    const pk = passK(r.repeats.grades, r.repeats.k);
     parts.push("## Consistency", "", `pass^${r.repeats.k} over ${r.repeats.scenarioIds.length} scenarios run ${r.repeats.k} times: ${pct(pk)} · ${frac(pk)}.`, "");
   }
   if (proj) {

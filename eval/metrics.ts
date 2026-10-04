@@ -88,9 +88,14 @@ export function breakdown(rows: Row[], key: "language" | "category"): Record<str
   return Object.fromEntries([...groups.entries()].sort().map(([k, v]) => [k, summarize(v)]));
 }
 
-/** pass^k: share of scenarios that passed in every one of k repeated runs (runs[i] = grades of scenario i). */
-export function passK(runs: Grade[][]): Rate {
-  return wilson(runs.filter((r) => r.length > 0 && r.every((g) => g.pass)).length, runs.length);
+/**
+ * pass^k: share of scenarios that passed in every one of k repeated runs (runs[i] = grades of scenario i). A
+ * scenario must have exactly k recorded grades to count as a pass^k success; one that ran fewer times (e.g. the
+ * repeat loop stopped early at the spend limit) is counted in the denominator but can never pass, so an
+ * incomplete repeat set cannot inflate the rate.
+ */
+export function passK(runs: Grade[][], k: number): Rate {
+  return wilson(runs.filter((r) => r.length === k && r.every((g) => g.pass)).length, runs.length);
 }
 
 /**
