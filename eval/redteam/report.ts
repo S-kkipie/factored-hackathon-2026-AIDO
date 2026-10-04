@@ -52,6 +52,10 @@ if (import.meta.main) {
   const promptfoo = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
   const corpusPath = join(ROOT, "reports/eval-redteam.md");
   const corpusReport = existsSync(corpusPath) ? readFileSync(corpusPath, "utf8").replace(/^# .*\n/, "") : undefined;
-  writeFileSync(join(ROOT, "reports/redteam.md"), renderRedteamReport({ promptfoo, corpusReport }));
+  // Manual adjudication of the grader's flags (reviewed against ops.sqlite / serving.sqlite) is kept in a committed
+  // file so regenerating the report never drops it.
+  const adjudicationPath = join(ROOT, "redteam/adjudication.md");
+  const adjudication = existsSync(adjudicationPath) ? `\n${readFileSync(adjudicationPath, "utf8")}` : "";
+  writeFileSync(join(ROOT, "reports/redteam.md"), renderRedteamReport({ promptfoo, corpusReport }) + adjudication);
   console.log("wrote reports/redteam.md");
 }

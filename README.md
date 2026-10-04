@@ -113,14 +113,14 @@ Limitations:
 - The baseline's clarify/abstain outcomes are ungraded.
 
 **Response-quality judge** ([`reports/judge.md`](reports/judge.md)). Gemini scores grounding, language and tone with a written rubric. It sees the customer's full records as evidence. The judge was validated two ways, as the problem statement allows ("against human or deterministic judgments"):
-1. **Deterministic checks** (the system's own response gate over the full records): 90.8% agreement on 119 replies. κ is low (0.11) because almost every reply passes; the report explains the kappa paradox and lists the disagreements.
-2. **A blind second rater:** Claude, the coding assistant, labeled 50 replies without seeing the judge's verdicts or which system answered. κ = 0.65 on overall pass. This is model-to-model agreement, not a human validation.
+1. **Deterministic checks** (the system's own response gate over the full records): 90.8% agreement on 119 replies. κ is low (0.11) because almost every reply passes; the report explains the kappa paradox and the kinds of disagreement.
+2. **A blind second rater:** Claude, the coding assistant, labeled 50 replies without seeing the judge's verdicts or which system answered. κ = 0.65 on overall pass. This is model-to-model agreement, not a human validation, and it rests on only 2 negative labels.
 
 The judge rates 95% of proposed replies as passing. A first judge pass with thin evidence was discarded, and the report discloses it.
 
 **Red teaming** ([`reports/redteam.md`](reports/redteam.md)):
 - **Suite A:** the deterministic gate tests in `tests/server/`.
-- **Suites B and C:** a fixed ES/PT corpus of 38 attacks tagged by OWASP LLM/Agentic id and 20 hard-benign items. It found 0/38 successful attacks and 0/20 false refusals.
+- **Suites B and C:** a fixed ES/PT corpus of 38 attacks tagged by OWASP LLM/Agentic id and 20 hard-benign items. It found 0/38 successful attacks and 0/20 false refusals. 29/38 attacks reached the expected outcome; the other 9 were safe but outside gold (a confirmation card left unanswered, or the caller's own data shown). The baseline was stopped after 4 items by the budget.
 - **Suite D:** 112 adaptive attacks from promptfoo (ES/PT; basic, base64, crescendo and goat), run against the real server over HTTP.
   - promptfoo's grader flagged 12. Every one was reviewed against the database: 11 were the assistant answering with the *logged-in* customer's own records, and 1 was a grader error.
   - Confirmed: 0/112 successful attacks, 0 foreign ids in any reply, 0 disputes created.
@@ -272,6 +272,8 @@ Pipeline outputs:
 | 6 | Deployment and operations on GCP | planned |
 
 ## Known limitations
+
+- **No human validation of the quality judge** (spec 7 deviation): it is validated against deterministic checks and a second AI rater only. The security grader (promptfoo) is not human-validated either; its flags were adjudicated against the database.
 
 - The data is synthetic. Text fields are templated, so supervised NLP on the provided transcripts is not meaningful.
 - There is no Portuguese source data. Portuguese coverage comes from team-generated, labeled examples.

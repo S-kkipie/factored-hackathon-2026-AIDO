@@ -13,7 +13,7 @@ export function cohenKappa(pairs: [boolean, boolean][]): number | null {
   return pe === 1 ? null : (po - pe) / (1 - pe);
 }
 
-/** Human label is the reference; positive = pass. */
+/** The reference rater (human, AI or deterministic) is taken as truth; positive = pass. */
 export function agreement(pairs: [boolean, boolean][]) {
   const pos = pairs.filter(([h]) => h);
   const neg = pairs.filter(([h]) => !h);

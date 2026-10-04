@@ -68,7 +68,7 @@ if (import.meta.main) {
       },
       {
         name: "a second AI rater (not human)",
-        description: "The 50-item blind sample labeled by Claude (Anthropic), the coding assistant, against the same rubric and evidence, without seeing the judge's verdicts or which system answered. This is model-to-model agreement and is NOT a human validation.",
+        description: "The 50-item sample labeled by Claude (Anthropic), the same coding assistant that built the system, against the same rubric and evidence, without seeing the second-pass verdicts or which system answered (it had seen the discarded first pass in aggregate). This is model-to-model agreement, not independent, and NOT a human validation.",
         labels: read("labels-ai.json"),
       },
       {
@@ -84,8 +84,10 @@ if (import.meta.main) {
         verdicts,
         references,
         notes: [
+          "No human validation: spec 7 asks for human labels (about 50, ideally 100–200 for safety) with κ ≥ 0.6. That requirement is not met. The deterministic κ is below 0.6, and the AI rater's 0.65 rests on 2 negative labels in n = 33.",
+          "The figures in these notes describe run eval-2026-10-04T03-00-40-141Z and judge v2026-10-04.2; recompute them after a rerun.",
           "Prevalence: almost every reply passes, so Cohen's κ is unstable (the kappa paradox): against the deterministic checks the judge agrees on 90.8% of items yet κ is low because the few negatives differ.",
-          "Where they differ: the deterministic gate checks only amounts, ids, language and commitment wording; it flags ids the customer typed and translated statuses (\"Aprobada\", \"Aprovada\") that the judge accepts, and it cannot see invented non-numeric facts (branch hours, a merchant category) that the judge rejects.",
+          "Where they differ: the deterministic gate checks only amounts, ids, language and commitment wording; it flags ids the customer typed and translated statuses (\"Aprobada\", \"Aprovada\") that the judge accepts, and it cannot see invented non-numeric facts (branch hours, a merchant category) that the judge rejects. Case references (D-…, H-…) are removed before the check, so an invented reference is not caught.",
           "Evidence revision: a first judge pass (judge v2026-10-04.1) gave the judge only the transactions cited by id and no masked numbers, limits, times or channels; it marked 47% of proposed replies ungrounded for facts that were in the database. The evidence and rubric were corrected (v2026-10-04.2) before the results above; the first pass is kept in data/ and not reported as the result.",
           "Budget: the second pass stopped at its spend limit after 119 of 150 items (100 proposed, 19 baseline); 33 of the 50 sampled items were judged.",
         ],

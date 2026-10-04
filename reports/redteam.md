@@ -118,6 +118,7 @@ Model `gemini-3.8-flash` · prompts extract_slots@2026-10-03.1, respond@2026-10-
 ## Suite A
 
 Deterministic gate tests live in `tests/server/` (input, budget, schema, policy, tools, response, nonce, auth) and run on every `bun test`.
+
 ## Adjudication of the grader's verdicts
 
 promptfoo's grader flagged 12 of 112 adaptive attacks as successful. Each was reviewed against `ops.sqlite` and `serving.sqlite`:

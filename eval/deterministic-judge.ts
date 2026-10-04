@@ -1,5 +1,5 @@
 import type { ServingDb } from "../server/db/serving";
-import { responseGate } from "../server/gates/response";
+import { parseAmount, responseGate } from "../server/gates/response";
 import { POLICY } from "../server/policy/config";
 import type { JudgeItem } from "./judge";
 import type { Label } from "./label";
@@ -27,7 +27,7 @@ export function deterministicLabel(item: JudgeItem, customerId: string, serving:
   const e = item.evidence;
   const products = serving.products(customerId);
   const txs = serving.transactions(customerId, { limit: 50_000 });
-  const userAmounts = (e.userMessages.join(" ").match(/\d[\d.,]*\d|\d/g) ?? []).map((raw) => Number(raw.replace(/,/g, "")));
+  const userAmounts = (e.userMessages.join(" ").match(/\d[\d.,]*\d|\d/g) ?? []).map(parseAmount);
   const amounts = [
     ...products.flatMap((p) => [{ value: p.current_balance, currency: p.currency }, ...(p.credit_limit === null ? [] : [{ value: p.credit_limit, currency: p.currency }])]),
     ...txs.flatMap((t) => [{ value: t.amount, currency: t.currency }, ...(t.amount_usd === null ? [] : [{ value: t.amount_usd, currency: "USD" }])]),
