@@ -4,6 +4,7 @@ import { sseResponse, startRun, toAgui } from "./api/agui";
 import { appendAudit } from "./audit";
 import { type Auth, AuthError, type SessionStatus } from "./auth";
 import type { TurnDeps } from "./graph/turn";
+import { customerCases, customerOverview, opsMetrics } from "./insights";
 import { listSpans } from "./trace";
 
 export interface AppDeps extends TurnDeps {
@@ -105,6 +106,24 @@ export function createApp(deps: AppDeps) {
       if ("error" in r) return r.error;
       if (r.session.role !== "customer") return json(403, { ruleId: "IN_ROLE" });
       return (await sessionMessages(deps.ops, r.session.sessionId, Number(query.after ?? 0) || 0)).filter((m) => m.author === "agent");
+    })
+    .get("/api/me/overview", async ({ request }) => {
+      const r = await authed(request, ["active", "handed_off"]);
+      if ("error" in r) return r.error;
+      if (r.session.role !== "customer" || !r.session.customerId) return json(403, { ruleId: "IN_ROLE" });
+      return customerOverview(deps.serving, r.session.customerId.v);
+    })
+    .get("/api/me/cases", async ({ request }) => {
+      const r = await authed(request, ["active", "handed_off"]);
+      if ("error" in r) return r.error;
+      if (r.session.role !== "customer" || !r.session.customerId) return json(403, { ruleId: "IN_ROLE" });
+      return customerCases(deps.ops, r.session.customerId.v);
+    })
+    .get("/api/ops/metrics", async ({ request, query }) => {
+      const r = await asAgent(request);
+      if ("error" in r) return r.error;
+      const hours = Math.min(24 * 30, Math.max(1, Math.trunc(Number(query.hours ?? 168)) || 168));
+      return opsMetrics(deps.ops, (deps.now ?? (() => new Date()))(), hours);
     })
     .get("/api/agent/queue", async ({ request }) => {
       const r = await asAgent(request);

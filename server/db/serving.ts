@@ -72,6 +72,10 @@ export interface ServingDb {
   transaction(customerId: string, transactionId: string): Promise<Transaction | null>;
   complaints(customerId: string): Promise<Complaint[]>;
   demoUsers(): Promise<{ persona: string; customer_id: string }[]>;
+  /** Approved purchases with a USD amount in [from, to), grouped by category. */
+  spendingByCategory(customerId: string, from: string, to: string): Promise<{ category: string; usd: number; count: number }[]>;
+  /** Approved purchases with a USD amount from `from` onwards, grouped by calendar month (YYYY-MM). */
+  spendingByMonth(customerId: string, from: string): Promise<{ month: string; usd: number; count: number }[]>;
 }
 
 const TX_COLUMNS = `transaction_id, transaction_date, product_id, customer_id, transaction_type, transaction_category,
@@ -120,5 +124,23 @@ export function openServing(sql: Sql): ServingDb {
         [customerId],
       ),
     demoUsers: () => sql.all<{ persona: string; customer_id: string }>("select persona, customer_id from serving.demo_users order by persona"),
+    spendingByCategory: (customerId, from, to) =>
+      sql.all<{ category: string; usd: number; count: number }>(
+        `select coalesce(transaction_category, 'Other') as category, sum(amount_usd)::float8 as usd, count(*)::int as count
+         from serving.transactions
+         where customer_id = $1 and transaction_type = 'Purchase' and transaction_status = 'Approved' and amount_usd is not null
+           and transaction_date >= $2 and transaction_date < $3
+         group by 1 order by usd desc`,
+        [customerId, from, to],
+      ),
+    spendingByMonth: (customerId, from) =>
+      sql.all<{ month: string; usd: number; count: number }>(
+        `select substr(transaction_date, 1, 7) as month, sum(amount_usd)::float8 as usd, count(*)::int as count
+         from serving.transactions
+         where customer_id = $1 and transaction_type = 'Purchase' and transaction_status = 'Approved' and amount_usd is not null
+           and transaction_date >= $2
+         group by 1 order by 1`,
+        [customerId, from],
+      ),
   };
 }
