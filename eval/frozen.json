@@ -1,5 +1,6 @@
 {
   "dev": "011c92aafbc0e237871f4a1d0e3b85ff8f74fa7846a1cbfca85bc1856977da68",
   "test": "4fe94b2689eed0baadee4fe0170f5e07d946647af9beb52bc39ac24fb8f39165",
+  "redteam": "94171e66e1aa15036ec96b53d0509293885eff80f3356131b4831ae8f05c9fd7",
   "seed": "aido-eval-*-1"
 }

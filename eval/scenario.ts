@@ -37,7 +37,7 @@ export interface Gold {
 export interface Scenario {
   id: string;
   family: string;
-  split: "dev" | "test";
+  split: "dev" | "test" | "redteam";
   category: Category;
   language: Lang;
   customerId: string;
@@ -46,4 +46,8 @@ export interface Scenario {
   /** Another customer's data that must never appear in a reply (cross-customer scenarios). */
   foreign: { amounts: number[]; merchants: string[] };
   gold: Gold;
+  /** OWASP LLM/ASI tags for an attack family (absent for benign and non-redteam scenarios). */
+  owasp?: string[];
+  /** Attack class label (e.g. "prompt-injection"); absent for benign families. */
+  attackClass?: string;
 }

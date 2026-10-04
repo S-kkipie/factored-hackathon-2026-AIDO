@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../pipeline/config";
 import { canonicalJson, sha256Hex } from "../server/hash";
+import { CORPUS } from "./redteam/corpus";
 import { SCENARIO_LANGS, type Scenario } from "./scenario";
 import { type Pick, SELECTORS } from "./select";
 import { FAMILIES } from "./templates";
@@ -17,10 +18,11 @@ export const scenarioHash = (scenarios: Scenario[]): string => sha256Hex(canonic
  */
 export function buildScenarios(
   db: Database,
-  o: { split: "dev" | "test"; seed: string; families?: string[]; allowShort?: boolean },
+  o: { split: "dev" | "test" | "redteam"; seed: string; families?: string[]; allowShort?: boolean },
 ): Scenario[] {
   const out: Scenario[] = [];
-  const families = o.families ? FAMILIES.filter((f) => o.families!.includes(f.id)) : FAMILIES;
+  const pool0 = o.split === "redteam" ? CORPUS : FAMILIES;
+  const families = o.families ? pool0.filter((f) => o.families!.includes(f.id)) : pool0;
   const pools = new Map<string, Pick[]>();
   for (const family of families) {
     let all = pools.get(family.selector);
@@ -32,7 +34,8 @@ export function buildScenarios(
     }
     // Different families on the same selector start at different offsets so they do not reuse the same customers.
     const offset = Number.parseInt(sha256Hex(`${o.seed}:${family.id}`).slice(0, 6), 16);
-    const pool = all.filter((_, i) => (o.split === "dev") === (i % 5 === 0));
+    // The redteam split takes its candidates from the whole pool: no dev/test partition.
+    const pool = o.split === "redteam" ? all : all.filter((_, i) => (o.split === "dev") === (i % 5 === 0));
     const usable = pool.length > 0 ? pool : all;
     if (usable.length === 0) {
       if (o.allowShort) continue;
@@ -54,6 +57,8 @@ export function buildScenarios(
           fault: built.fault ?? null,
           foreign: built.foreign ?? { amounts: [], merchants: [] },
           gold: built.gold,
+          ...(family.owasp ? { owasp: family.owasp } : {}),
+          ...(family.attackClass ? { attackClass: family.attackClass } : {}),
         });
       }
     });
@@ -66,7 +71,7 @@ if (import.meta.main) {
   const dir = join(ROOT, "data/eval");
   mkdirSync(dir, { recursive: true });
   const hashes: Record<string, string> = {};
-  for (const split of ["dev", "test"] as const) {
+  for (const split of ["dev", "test", "redteam"] as const) {
     const scenarios = buildScenarios(db, { split, seed: `aido-eval-${split}-1` });
     writeFileSync(join(dir, `${split}.json`), JSON.stringify(scenarios, null, 1));
     hashes[split] = scenarioHash(scenarios);
