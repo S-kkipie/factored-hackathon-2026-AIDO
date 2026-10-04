@@ -93,7 +93,7 @@ The baseline and the proposed system replay the same frozen held-out workload: a
 
 | Layer | Choice |
 |---|---|
-| Runtime / API | [Bun](https://bun.sh) + [Elysia](https://elysiajs.com), TypeScript end to end |
+| Runtime / API | [Bun](https://bun.sh) + [Elysia](https://elysiajs.com), TypeScript end to end; the web app calls the REST routes through a typed fetch client over the server's own types (Eden Treaty was planned, but it types the raw `Response` returns used for 401/403/409 as untyped data) |
 | Orchestration | [LangGraph JS](https://langchain-ai.github.io/langgraphjs/) with custom nodes, interrupts and a SQLite checkpointer |
 | Models | Gemini Flash (extraction and replies), intent router: Jev vs. own embeddings + logistic regression vs. baselines |
 | Agent ↔ UI | [AG-UI](https://docs.ag-ui.com) protocol over SSE |
@@ -106,7 +106,9 @@ The baseline and the proposed system replay the same frozen held-out workload: a
 
 ```
 pipeline/   data contracts, incremental staging, curation, quality report (Bun + DuckDB)
-server/     auth, tools, policy engine, gates, LangGraph graph, API (in progress)
+server/     auth, tools, policy engine, gates, LangGraph graph, API
+web/        React + Vite + TanStack Router app: login, chat, agent console, trace view
+ml/         intent-router dataset, training and experiments
 tests/      unit and end-to-end tests (bun test)
 reports/    generated data-quality, demand and evaluation reports
 docs/
@@ -136,13 +138,38 @@ The dataset and the derived `serving.sqlite` are distributed to participants onl
 ```bash
 export JWT_SECRET=$(openssl rand -hex 32)   # required, ≥ 32 chars
 export GEMINI_API_KEY=...                    # optional; without it the assistant uses templates and escalates
-bun run dev                                  # http://localhost:8080
+bun run dev                                  # API on http://localhost:8080
+bun run dev:web                              # web app on http://localhost:5173 (proxies /api to :8080)
 bun run smoke                                # scripted ES/PT turns over data/serving.sqlite
 ```
+
+Single process, as deployed: `bun run build:web && bun run start` serves the web app and the API together on :8080 (`WEB_DIR` overrides the build directory). HTML is served with a strict Content-Security-Policy.
+
+**Web app** (spec 9). Demo PINs: customer `2468`, agent `1357`.
+
+| Page | Purpose |
+|---|---|
+| `/login` | Pick a demo persona and the language (Spanish or Portuguese) |
+| `/chat` | Customer chat over AG-UI: live step status, router confidence, rule ids; disputes are confirmed only with the confirm card (nonce-bound), and the case id is shown on success; handoffs show a banner and the human agent's replies |
+| `/agent` | Agent console: handoff queue, structured handoff card with rule explanations, take / reply / close and hand back to the assistant |
+| `/trace/:session` | Per-turn timeline: graph nodes, router label and confidence, policy decision, rule ids, latency, LLM tokens and cost (no message content) |
+
+| Persona | What it exercises |
+|---|---|
+| `normal` | No alerts: balance, transactions, charge explanations and automatic dispute intake |
+| `high_amount` | Charges above USD 250: disputes go to a human |
+| `fraud_suspect` | `fraud_score` ≥ 30: escalation for suspected fraud |
+| `repeat_complainer` | Complaint history: disputes go to human review |
+| `suspended` | Suspended status: human service only |
+
+![Dispute confirmation in the chat](docs/screenshots/chat-confirm-card.png)
+![Trace view](docs/screenshots/trace.png)
+![Agent console](docs/screenshots/agent.png)
 
 | Route | Purpose |
 |---|---|
 | `GET /api/health` | Liveness check |
+| `GET /api/session` | The caller's session: id, role, language, status, expiry |
 | `GET /api/demo-users` | Demo personas available to log in as |
 | `POST /api/auth/login` | Demo login `{persona, pin, language}` → JWT (15 min) |
 | `POST /api/auth/logout` | Ends the caller's own session; its token stops verifying immediately |
@@ -186,7 +213,7 @@ Pipeline outputs:
 | 2a | Core domain: auth, tools, policy, gates | done |
 | 2b | Conversation graph, Gemini, AG-UI API, agent console, traces | done |
 | 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
-| 4 | Web UI: chat, agent console, trace viewer | planned |
+| 4 | Web UI: chat, agent console, trace viewer | done |
 | 5 | Evaluation harness and red teaming | planned |
 | 6 | Deployment and operations on GCP | planned |
 

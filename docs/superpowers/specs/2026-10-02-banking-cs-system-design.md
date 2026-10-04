@@ -56,7 +56,7 @@ JSON validated by schema: request summary, verified facts (with transaction ids)
 
 | Layer | Choice |
 |---|---|
-| Runtime / API | Bun + Elysia (TypeBox schemas), Eden Treaty typed client |
+| Runtime / API | Bun + Elysia (TypeBox schemas), typed fetch client over shared server types (plan 4 ruling: replaces Eden Treaty) |
 | Orchestration | LangGraph JS (`@langchain/langgraph`), custom nodes only; no prebuilt ReAct agent |
 | Generation / extraction | Gemini Flash (`@google/genai`), JSON output validated by schema |
 | Intent routing | Best of 4 routers by evaluation (see §6); Jev (`@typesafe-ai/sdk`) candidate |

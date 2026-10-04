@@ -11,6 +11,7 @@ docs/*
 !docs/data_findings.md
 !docs/superpowers/
 !docs/research/
+!docs/screenshots/
 !docs/architecture.html
 .playwright-mcp/
 .superpowers/
