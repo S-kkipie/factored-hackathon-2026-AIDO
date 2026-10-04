@@ -6,14 +6,17 @@
     "download": "bun pipeline/download.ts",
     "pipeline": "bun pipeline/run.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "dev": "bun --watch server/main.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "build:web": "vite build --config web/vite.config.ts",
     "start": "bun server/main.ts",
     "smoke": "bun server/smoke.ts",
     "ml:generate": "bun ml/generate.ts",
     "train": "bun ml/train.ts"
   },
   "dependencies": {
+    "@ag-ui/client": "1.0.1",
     "@ag-ui/core": "1.0.1",
     "@ag-ui/encoder": "1.0.1",
     "@duckdb/node-api": "^1.5.6-r.1",
@@ -22,11 +25,18 @@
     "@langchain/langgraph": "1.4.18",
     "@langchain/langgraph-checkpoint": "1.1.5",
     "@sinclair/typebox": "^0.34.52",
+    "@tanstack/react-router": "1.170.41",
     "elysia": "1.4.30",
-    "jose": "^6.2.12"
+    "jose": "^6.2.12",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
-    "typescript": "^7.0.2"
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "8.3.2"
   }
 }

@@ -1,0 +1,29 @@
+import { Link, Outlet } from "@tanstack/react-router";
+
+export function Layout() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <Link to="/login" className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            LB
+          </span>
+          <span>
+            LATAM Bank <span className="muted">· AIDO</span>
+          </span>
+        </Link>
+        <nav className="nav">
+          <Link to="/chat" activeProps={{ className: "active" }}>
+            Chat
+          </Link>
+          <Link to="/agent" activeProps={{ className: "active" }}>
+            Consola de agentes
+          </Link>
+        </nav>
+      </header>
+      <main className="main">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
