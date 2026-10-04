@@ -132,7 +132,10 @@ function onEvent(s: ChatState, e: BaseEvent): ChatState {
 export function chatReducer(s: ChatState, a: ChatAction): ChatState {
   switch (a.type) {
     case "user":
-      return { ...s, lines: [...s.lines, { id: a.id, author: "user", text: a.text }], error: null };
+      // Optimistic: mark the turn running the instant the user message is queued, not when RUN_STARTED
+      // arrives — a React dispatch doesn't update state synchronously, so a second fast submit/click would
+      // otherwise still read the pre-update `running: false` and race a second runAgent() call.
+      return { ...s, lines: [...s.lines, { id: a.id, author: "user", text: a.text }], error: null, running: true };
     case "event":
       return onEvent(s, a.event);
     case "agent_messages": {
@@ -152,6 +155,7 @@ export function chatReducer(s: ChatState, a: ChatAction): ChatState {
     case "failed":
       return { ...s, running: false, step: null, error: a.message };
     case "resume_sent":
-      return { ...s, pending: null };
+      // Same optimism as "user": the confirm/cancel click is itself the start of a new run.
+      return { ...s, pending: null, running: true };
   }
 }

@@ -44,7 +44,7 @@ describe("chatReducer", () => {
     expect(done.pending).toBeNull();
   });
 
-  test("an interrupt becomes a pending confirmation; resume_sent clears it", () => {
+  test("an interrupt becomes a pending confirmation; resume_sent clears it and marks the turn running again", () => {
     const s = reduce([
       ev({ type: EventType.RUN_STARTED, threadId: "t", runId: "r" }),
       ev({
@@ -59,7 +59,18 @@ describe("chatReducer", () => {
     ]);
     expect(s.pending).toEqual({ interruptId: "i1", message: "¿Confirmas?", nonce: "n1", expiresAt: "2026-06-17T10:00:00Z" });
     expect(s.running).toBe(false);
-    expect(chatReducer(s, { type: "resume_sent" }).pending).toBeNull();
+    const resumed = chatReducer(s, { type: "resume_sent" });
+    expect(resumed.pending).toBeNull();
+    // Optimistic: the confirm/cancel click itself starts a new run, before RUN_STARTED arrives, so a second
+    // click (or a fast composer submit) can't race in a second runAgent() call.
+    expect(resumed.running).toBe(true);
+  });
+
+  test("a user action optimistically marks the turn running before RUN_STARTED arrives", () => {
+    const s = chatReducer(initialChat, { type: "user", id: "u1", text: "Hola" });
+    expect(s.running).toBe(true);
+    expect(s.error).toBeNull();
+    expect(chatReducer(s, { type: "failed", message: "x" }).running).toBe(false);
   });
 
   test("case and handoff ids are kept; a handoff marks the chat as handed off", () => {

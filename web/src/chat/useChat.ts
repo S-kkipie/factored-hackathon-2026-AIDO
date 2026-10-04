@@ -17,6 +17,10 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
   const stateRef = useRef<ChatState>(state);
   stateRef.current = state;
   const agentRef = useRef<HttpAgent | null>(null);
+  // Synchronous guard against a double-submit race: `running` only flips in state after a dispatch is
+  // committed, which isn't synchronous, so two fast submits/clicks could both pass the `s.running` check
+  // below and start two concurrent runAgent() calls on the same HttpAgent (which does not guard against it).
+  const inFlight = useRef(false);
   if (!agentRef.current) {
     agentRef.current = new HttpAgent({
       url: "/api/agui/run",
@@ -37,6 +41,8 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
 
   const failed = useCallback(async () => {
     dispatch({ type: "failed", message: t.turnFailed });
+    // runAgent()'s thrown error is a raw client/network failure, not an ApiError, so 401 (session expiry)
+    // can only be detected by making a separate call that does throw ApiError.
     try {
       await customerApi.session();
     } catch (e) {
@@ -48,14 +54,17 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
     async (text: string) => {
       const clean = text.trim();
       const s = stateRef.current;
-      if (!clean || s.running || s.pending) return;
-      const id = crypto.randomUUID();
-      dispatch({ type: "user", id, text: clean });
-      agentRef.current!.addMessage({ id, role: "user", content: clean });
+      if (!clean || s.running || s.pending || inFlight.current) return;
+      inFlight.current = true;
       try {
+        const id = crypto.randomUUID();
+        dispatch({ type: "user", id, text: clean });
+        agentRef.current!.addMessage({ id, role: "user", content: clean });
         await agentRef.current!.runAgent({ runId: crypto.randomUUID() });
       } catch {
         await failed();
+      } finally {
+        inFlight.current = false;
       }
     },
     [failed],
@@ -64,9 +73,10 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
   const answer = useCallback(
     async (approved: boolean) => {
       const p = stateRef.current.pending;
-      if (!p || stateRef.current.running) return;
-      dispatch({ type: "resume_sent" });
+      if (!p || stateRef.current.running || inFlight.current) return;
+      inFlight.current = true;
       try {
+        dispatch({ type: "resume_sent" });
         await agentRef.current!.runAgent({
           runId: crypto.randomUUID(),
           resume: [
@@ -77,6 +87,8 @@ export function useChat(session: StoredCustomer, onExpired: () => void) {
         });
       } catch {
         await failed();
+      } finally {
+        inFlight.current = false;
       }
     },
     [failed],
