@@ -138,7 +138,7 @@ legend { font-weight: 600; margin-bottom: 8px; }
 .steps { display: grid; gap: 4px; }
 .step { display: grid; grid-template-columns: 150px 1fr 90px; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; }
 .step:nth-child(odd) { background: var(--surface-2); }
-.step.chat { padding-left: 28px; }
+.step.step-chat { padding-left: 28px; }
 .step .bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
 .step .ms { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
 .step-detail { grid-column: 2 / 4; }

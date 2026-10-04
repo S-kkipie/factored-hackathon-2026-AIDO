@@ -60,6 +60,17 @@ describe("groupTrace", () => {
     expect(t!.steps[0]!.error).toBe("ToolError");
   });
 
+  test("on equal start times the enclosing node precedes its chat span; a confirmation pause is not an error", () => {
+    const [t] = groupTrace([
+      span({ name: "chat gemini-3.8-flash", trace_id: "x", started_at: "2026-10-03T10:00:00.000Z", duration_ms: 700, attributes: { "bank.cost_usd": 0.0002 } }),
+      span({ name: "bank.node.extract", trace_id: "x", started_at: "2026-10-03T10:00:00.000Z", duration_ms: 710 }),
+      span({ name: "bank.node.confirm", trace_id: "x", started_at: "2026-10-03T10:00:00.800Z", duration_ms: 1, attributes: { "error.type": "GraphInterrupt" } }),
+    ]);
+    expect(t!.steps.map((s) => s.name)).toEqual(["extract", "chat", "confirm"]);
+    expect(t!.steps[2]).toMatchObject({ error: null, interrupted: true });
+    expect(t!.steps[0]!.interrupted).toBe(false);
+  });
+
   test("real spans from a server turn group into one turn with a router step", async () => {
     const h = await harness({ script: byPurpose({}, "Su tarjeta PRD-A1 tiene un saldo de 1200.50 USD.") });
     const app = createApp({ ...h.deps, auth: h.auth });

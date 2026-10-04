@@ -13,6 +13,8 @@ export interface TraceStep {
   outputTokens: number | null;
   costUsd: number | null;
   error: string | null;
+  /** The run paused here for an out-of-band confirmation (spec 3.2-5). */
+  interrupted: boolean;
 }
 
 export interface TraceTurn {
@@ -34,6 +36,7 @@ const ms = (iso: string) => Date.parse(iso);
 function toStep(s: SpanRecord): TraceStep {
   const a = s.attributes;
   const chat = s.name.startsWith("chat ");
+  const interrupted = a["error.type"] === "GraphInterrupt";
   const label = str(a["bank.router.label"]);
   const confidence = num(a["bank.router.confidence"]);
   return {
@@ -48,7 +51,9 @@ function toStep(s: SpanRecord): TraceStep {
     inputTokens: num(a["gen_ai.usage.input_tokens"]),
     outputTokens: num(a["gen_ai.usage.output_tokens"]),
     costUsd: num(a["bank.cost_usd"]),
-    error: str(a["error.type"]),
+    // A confirmation pause is LangGraph's GraphInterrupt: expected control flow, not a failure.
+    error: interrupted ? null : str(a["error.type"]),
+    interrupted,
   };
 }
 
@@ -57,7 +62,9 @@ export function groupTrace(spans: SpanRecord[]): TraceTurn[] {
   const byTrace = new Map<string, SpanRecord[]>();
   for (const s of spans) byTrace.set(s.trace_id, [...(byTrace.get(s.trace_id) ?? []), s]);
   const turns = [...byTrace.entries()].map(([traceId, group]) => {
-    const sorted = [...group].sort((x, y) => ms(x.started_at) - ms(y.started_at));
+    // Start times have millisecond resolution: on a tie the enclosing (longer) node span comes before the chat
+    // span it contains.
+    const sorted = [...group].sort((x, y) => ms(x.started_at) - ms(y.started_at) || y.duration_ms - x.duration_ms);
     const steps = sorted.map(toStep);
     const start = Math.min(...sorted.map((s) => ms(s.started_at)));
     const end = Math.max(...sorted.map((s) => ms(s.started_at) + s.duration_ms));

@@ -20,7 +20,10 @@ export function LoginPage() {
     customerApi
       .demoUsers()
       .then((users) => {
-        if (users.length > 0) setPersonas(users.map((u) => u.persona));
+        // Show personas in the scenario order of PERSONAS (normal first), unknown ones last.
+        const order = Object.keys(PERSONAS);
+        const rank = (p: string) => (order.includes(p) ? order.indexOf(p) : order.length);
+        if (users.length > 0) setPersonas(users.map((u) => u.persona).sort((a, b) => rank(a) - rank(b)));
       })
       .catch(() => {
         // Keep the built-in persona list; login will report a real failure.

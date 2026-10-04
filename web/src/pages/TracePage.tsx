@@ -3,7 +3,7 @@ import { ApiError } from "../lib/api";
 import { ruleText } from "../lib/rules-text";
 import { type TraceTurn, groupTrace } from "../lib/trace";
 import { traceRoute } from "../router";
-import { agentApi, customerApi, readAgent } from "../session";
+import { agentApi, customerApi, readAgent, readCustomer } from "../session";
 
 const usd = (n: number) => `$${n.toFixed(n < 0.01 ? 6 : 4)}`;
 
@@ -13,10 +13,25 @@ export function TracePage() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    // An agent may read any session's trace; a customer only their own (enforced by the server).
-    const api = readAgent() ? agentApi : customerApi;
+    // An agent may read any session's trace; a customer only their own (enforced by the server). Try the
+    // credential that matches this session first, then the other one: a tab can hold both tokens and either may
+    // have expired.
+    const own = readCustomer()?.sessionId === session;
+    const order = own || !readAgent() ? [customerApi, agentApi] : [agentApi, customerApi];
     try {
-      setTurns(groupTrace(await api.trace(session)));
+      let spans: Awaited<ReturnType<typeof agentApi.trace>> | null = null;
+      let last: unknown = null;
+      for (const api of order) {
+        try {
+          spans = await api.trace(session);
+          break;
+        } catch (e) {
+          if (!(e instanceof ApiError && (e.status === 401 || e.status === 403))) throw e;
+          last = e;
+        }
+      }
+      if (!spans) throw last;
+      setTurns(groupTrace(spans));
       setError(null);
     } catch (e) {
       setError(e instanceof ApiError && (e.status === 401 || e.status === 403) ? "Sin acceso a esta traza. Inicia sesión como agente o como el cliente de esta sesión." : "No se pudo cargar la traza.");
@@ -68,11 +83,11 @@ export function TracePage() {
           </div>
           <div className="steps">
             {t.steps.map((s, i) => (
-              <div key={i} className={`step ${s.kind}`}>
+              <div key={i} className={`step step-${s.kind}`}>
                 <span className="mono">{s.kind === "chat" ? `↳ ${s.model ?? "chat"}` : s.name}</span>
                 <span className="bar" style={{ width: `${Math.max(1, Math.round((s.durationMs / Math.max(1, t.durationMs)) * 100))}%` }} />
                 <span className="ms">{Math.round(s.durationMs)} ms</span>
-                {(s.router || s.decision || s.ruleIds.length > 0 || s.costUsd !== null || s.error) && (
+                {(s.router || s.decision || s.ruleIds.length > 0 || s.costUsd !== null || s.error || s.interrupted) && (
                   <div className="step-detail chips">
                     {s.router && (
                       <span className="chip">
@@ -90,6 +105,7 @@ export function TracePage() {
                         {s.inputTokens ?? 0} in / {s.outputTokens ?? 0} out · {usd(s.costUsd)}
                       </span>
                     )}
+                    {s.interrupted && <span className="chip warn">esperando confirmación</span>}
                     {s.error && <span className="chip danger">{s.error}</span>}
                   </div>
                 )}
