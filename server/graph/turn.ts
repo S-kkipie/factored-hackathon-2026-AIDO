@@ -19,7 +19,7 @@ import type { Router } from "../router/types";
 import type { RuleId } from "../rules";
 import type { Tools } from "../tools";
 import { ToolError } from "../tools/runtime";
-import { Tracer } from "../trace";
+import { Tracer, type SpanSink } from "../trace";
 import { buildGraph, type ConversationGraph } from "./build";
 import type { GraphDeps } from "./deps";
 import { type ConfirmInterrupt, type Confirmation, type Outcome, type TurnValues, freshTurn } from "./state";
@@ -40,6 +40,8 @@ export interface TurnDeps {
   now?: () => Date;
   /** Offline-evaluation debug seam: receives model drafts the response gate rejected. Never set by the HTTP server. */
   onDraftRejected?: (draft: string, ruleIds: string[]) => void;
+  /** Optional span exporter (Langfuse OTLP); spans are always persisted to ops.sqlite. */
+  sink?: SpanSink;
 }
 
 export type TurnOutcome = Outcome | "confirm" | "blocked" | "handed_off" | "confirmation_invalid";
@@ -66,7 +68,7 @@ function customerOf(session: CustomerSession) {
 }
 
 function graphFor(deps: TurnDeps, session: CustomerSession, turn: number, now: Date) {
-  const tracer = new Tracer(deps.ops, session.sessionId);
+  const tracer = new Tracer(deps.ops, session.sessionId, undefined, deps.sink);
   const gd: GraphDeps = {
     sessionId: session.sessionId,
     customerId: customerOf(session),
