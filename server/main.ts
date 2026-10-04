@@ -4,24 +4,34 @@ import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { loadServerConfig } from "./config";
 import { openServing } from "./db/serving";
-import { openDatabase } from "./db/sql";
+import { type Sql, openDatabase } from "./db/sql";
 import { CircuitBreaker } from "./gates/budget";
 import { SqlCheckpointSaver } from "./graph/checkpointer";
 import { createGeminiLlm } from "./llm/gemini";
+import type { Llm } from "./llm/types";
 import { staticHandler } from "./static";
 import { SpendLedger } from "./llm/ledger";
 import { createGeminiEmbedder } from "./llm/embedder";
 import { RunBudget, meteredEmbedder } from "./llm/metered";
 import { createConfiguredRouter } from "./router/select";
-import { createTools } from "./tools";
+import { type Tools, createTools } from "./tools";
 
-export async function createServer(env: Record<string, string | undefined> = process.env) {
+/** Seams for the evaluation harness: an isolated database and wrapped tools (fault injection). */
+export interface ServerOverrides {
+  db?: Sql;
+  tools?: (real: Tools) => Tools;
+  ledger?: SpendLedger;
+  /** Replaces the Gemini client (scripted model for offline runs); `null` forces template-only mode. */
+  llm?: Llm | null;
+}
+
+export async function createServer(env: Record<string, string | undefined> = process.env, o: ServerOverrides = {}) {
   const cfg = loadServerConfig(env);
-  const ops = await openDatabase(cfg);
+  const ops = o.db ?? (await openDatabase(cfg));
   const serving = openServing(ops);
   const auth = createAuth(cfg, serving, ops);
-  const llm = cfg.geminiApiKey ? createGeminiLlm(cfg.geminiApiKey, cfg.geminiModel) : null;
-  const ledger = new SpendLedger(cfg.spendLedgerPath, cfg.llmTotalCapUsd);
+  const llm = o.llm !== undefined ? o.llm : cfg.geminiApiKey ? createGeminiLlm(cfg.geminiApiKey, cfg.geminiModel) : null;
+  const ledger = o.ledger ?? new SpendLedger(cfg.spendLedgerPath, cfg.llmTotalCapUsd);
   // Router embeddings are metered against the same project cap (LLM_TOTAL_CAP_USD); SAFE_MODE disables every model call.
   // The run limit is set to the project cap on purpose: the router is not a chat call and bypasses per-turn and session/daily budgets.
   const embedder =
@@ -40,7 +50,7 @@ export async function createServer(env: Record<string, string | undefined> = pro
     cfg,
     serving,
     ops,
-    tools: createTools(serving, ops),
+    tools: o.tools ? o.tools(createTools(serving, ops)) : createTools(serving, ops),
     auth,
     router: routing.router,
     llm,

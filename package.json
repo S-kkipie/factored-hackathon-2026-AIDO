@@ -16,7 +16,8 @@
     "web:dev": "vite --config web/vite.config.ts",
     "web:build": "vite build --config web/vite.config.ts",
     "ml:generate": "bun ml/generate.ts",
-    "train": "bun ml/train.ts"
+    "train": "bun ml/train.ts",
+    "eval": "bun eval/run.ts"
   },
   "dependencies": {
     "@ag-ui/core": "1.0.1",
