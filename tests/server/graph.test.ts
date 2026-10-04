@@ -15,7 +15,7 @@ describe("read intents", () => {
     const h = await harness();
     const ev = await h.send("¡Hola!");
     expect(doneOf(ev).outcome).toBe("greeting");
-    expect(messageOf(ev)).toContain("LATAM Bank");
+    expect(messageOf(ev)).toContain("AIDO");
     expect((h.llm as ReturnType<typeof fakeLlm>).requests.length).toBe(0);
   });
 

@@ -165,7 +165,7 @@ describe("agent console", () => {
 
     expect((await call(`/api/agent/sessions/${s.sessionId}/resume`, { method: "POST" }, a)).status).toBe(200);
     const after = await run(s.token, s.sessionId, say("hola"));
-    expect(after.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("LATAM Bank");
+    expect(after.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("AIDO");
   });
 
   test("agent resume after the customer logged out does not revive a revoked token", async () => {
