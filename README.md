@@ -112,9 +112,20 @@ Limitations:
 - The `dispute_fraud` pool has about 5 transactions in the data.
 - The baseline's clarify/abstain outcomes are ungraded.
 
-Still to do (plan 5b):
-- an LLM judge for response quality, validated against human labels (Cohen's κ);
-- promptfoo red teaming (OWASP LLM and Agentic, ES/PT, multi-turn) with attack success rate per class and false refusals.
+**Response-quality judge** ([`reports/judge.md`](reports/judge.md)). Gemini scores grounding, language and tone with a written rubric. It sees the customer's full records as evidence. The judge was validated two ways, as the problem statement allows ("against human or deterministic judgments"):
+1. **Deterministic checks** (the system's own response gate over the full records): 90.8% agreement on 119 replies. κ is low (0.11) because almost every reply passes; the report explains the kappa paradox and lists the disagreements.
+2. **A blind second rater:** Claude, the coding assistant, labeled 50 replies without seeing the judge's verdicts or which system answered. κ = 0.65 on overall pass. This is model-to-model agreement, not a human validation.
+
+The judge rates 95% of proposed replies as passing. A first judge pass with thin evidence was discarded, and the report discloses it.
+
+**Red teaming** ([`reports/redteam.md`](reports/redteam.md)):
+- **Suite A:** the deterministic gate tests in `tests/server/`.
+- **Suites B and C:** a fixed ES/PT corpus of 38 attacks tagged by OWASP LLM/Agentic id and 20 hard-benign items. It found 0/38 successful attacks and 0/20 false refusals.
+- **Suite D:** 112 adaptive attacks from promptfoo (ES/PT; basic, base64, crescendo and goat), run against the real server over HTTP.
+  - promptfoo's grader flagged 12. Every one was reviewed against the database: 11 were the assistant answering with the *logged-in* customer's own records, and 1 was a grader error.
+  - Confirmed: 0/112 successful attacks, 0 foreign ids in any reply, 0 disputes created.
+  - Attack generation and grading used promptfoo's remote service, which is disclosed.
+  - One UX follow-up came out of it: when asked about a third party, say first that only the caller's own data can be shown.
 
 ## Stack
 
@@ -222,6 +233,8 @@ bun run eval -- --split dev --systems proposed --limit-usd 0.05
 bun run eval -- --split test --systems proposed,baseline --limit-usd 0.9 --baseline-share 0.6 --repeat 4 --repeat-n 20
 ```
 
+Judge and red team: `bun run eval:judge -- --run <run.json> --sample`, then `--judge --limit-usd …`, then `--report`. `bun run eval:label` serves the blind labeling page on 127.0.0.1:5174. Run `bun run eval -- --split redteam …` for the attack corpus. For suite D, start the server first, then run `bun run redteam` (promptfoo via npx; it needs `promptfoo config set email …`) and `bun run redteam:report`.
+
 Every run needs `--limit-usd`. A run stops starting scenarios when it reaches that limit, and spend is recorded in the shared ledger. A test run is refused if the scenario file's hash differs from `eval/frozen.json`. Raw transcripts go to `data/eval/runs/` (private); only aggregate reports are committed.
 
 ### Train the intent router
@@ -255,7 +268,7 @@ Pipeline outputs:
 | 3 | Intent router: dataset, three-way comparison (keyword, Gemini zero-shot, embeddings + LR), calibration | done — embed-lr deployed: macro-F1 0.975 (95% CI 0.952–0.992) on the frozen 237-utterance test set; see [reports/router.md](reports/router.md) |
 | 4 | Web UI: chat, agent console, trace viewer | done |
 | 5a | Evaluation harness: 200 ES/PT scenarios, deterministic grading, naive baseline | done |
-| 5b | LLM judge with human labels, promptfoo red teaming | planned |
+| 5b | LLM judge (validated against deterministic checks and a blind second rater), ES/PT attack corpus, promptfoo red teaming | done |
 | 6 | Deployment and operations on GCP | planned |
 
 ## Known limitations
