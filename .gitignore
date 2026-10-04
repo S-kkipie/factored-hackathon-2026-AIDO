@@ -16,3 +16,5 @@ docs/*
 .playwright-mcp/
 .superpowers/
 reports/eval-dev.md
+redteam/output/
+.promptfoo/
