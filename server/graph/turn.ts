@@ -8,6 +8,7 @@ import type { ServingDb } from "../db/serving";
 import { CallCounter, type CircuitBreaker, checkBudget, recordTurn } from "../gates/budget";
 import { injectionSignal } from "../gates/injection";
 import { inputGate } from "../gates/input";
+import type { PromptInspector } from "../gates/model-armor";
 import { consumeNonce, issueNonce } from "../gates/nonce";
 import { canonicalJson, sha256Hex } from "../hash";
 import { createGateway } from "../llm/gateway";
@@ -42,6 +43,8 @@ export interface TurnDeps {
   onDraftRejected?: (draft: string, ruleIds: string[]) => void;
   /** Optional span exporter (Langfuse OTLP); spans are always persisted to ops.sqlite. */
   sink?: SpanSink;
+  /** Optional Model Armor inspector (inspect-only signal, spec 4.5). */
+  armor?: PromptInspector;
 }
 
 export type TurnOutcome = Outcome | "confirm" | "blocked" | "handed_off" | "confirmation_invalid";
@@ -199,6 +202,22 @@ function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId
   }
 }
 
+/**
+ * Model Armor is an optional, inspect-only second opinion (spec 4.5): a flag or an error both become one audit
+ * event and the method never throws into the turn — any error (including a timeout) counts as "no signal".
+ */
+async function armorSignal(deps: TurnDeps, sessionId: string, text: string): Promise<boolean> {
+  if (!deps.armor) return false;
+  try {
+    const r = await deps.armor.inspect(text);
+    appendAudit(deps.ops, { sessionId, kind: "model_armor", payload: { flagged: r.flagged } });
+    return r.flagged;
+  } catch {
+    appendAudit(deps.ops, { sessionId, kind: "model_armor_error", payload: {} });
+    return false;
+  }
+}
+
 const handoffsOf = (ops: Database, sessionId: string) =>
   ops.query<{ n: number }, [string]>("select count(*) as n from handoffs where session_id = ?").get(sessionId)?.n ?? 0;
 
@@ -284,7 +303,7 @@ async function* runTurnLocked(deps: TurnDeps, session: CustomerSession, text: st
   appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", payload: { turn, pii: gate.piiFound } });
 
   const { app } = graphFor(deps, session, turn, now);
-  yield* drive(deps, app, sid, freshTurn(gate.text, lang, injectionSignal(gate.text)), now.getTime());
+  yield* drive(deps, app, sid, freshTurn(gate.text, lang, injectionSignal(gate.text) || (await armorSignal(deps, sid, gate.text))), now.getTime());
 }
 
 export interface ResumeInput {

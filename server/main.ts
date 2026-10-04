@@ -7,6 +7,7 @@ import { openOps } from "./db/ops";
 import { openServing } from "./db/serving";
 import type { ServingDb } from "./db/serving";
 import { CircuitBreaker } from "./gates/budget";
+import { createModelArmor } from "./gates/model-armor";
 import { BunSqliteSaver } from "./graph/checkpointer";
 import { createGeminiLlm } from "./llm/gemini";
 import { SpendLedger } from "./llm/ledger";
@@ -67,6 +68,7 @@ export function createServer(env: Record<string, string | undefined> = process.e
     webDir: cfg.webDir,
     onDraftRejected: o.onDraftRejected,
     sink,
+    armor: cfg.modelArmor ? createModelArmor(cfg.modelArmor) : undefined,
   });
   return { cfg, app, llm, ledger, routing, ops, serving, sink };
 }
@@ -76,6 +78,6 @@ if (import.meta.main) {
   app.listen(cfg.port);
   process.on("SIGTERM", () => void sink?.shutdown().finally(() => process.exit(0)));
   console.log(
-    `AIDO server on :${cfg.port} · model ${llm ? cfg.geminiModel : "none (templates + escalation only)"}${cfg.safeMode ? " · SAFE_MODE" : ""} · router ${routing.router.name} (${routing.reason}) · LLM spend $${ledger.total().toFixed(4)} of $${ledger.capUsd}${sink ? " · traces → Langfuse" : ""}`,
+    `AIDO server on :${cfg.port} · model ${llm ? cfg.geminiModel : "none (templates + escalation only)"}${cfg.safeMode ? " · SAFE_MODE" : ""} · router ${routing.router.name} (${routing.reason}) · LLM spend $${ledger.total().toFixed(4)} of $${ledger.capUsd}${sink ? " · traces → Langfuse" : ""}${cfg.modelArmor ? " · Model Armor" : ""}`,
   );
 }
