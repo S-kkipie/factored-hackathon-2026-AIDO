@@ -65,13 +65,17 @@ const NOT_MONEY: RegExp[] = [
 
 const BARE_NUMBER = /(?<![\p{L}\d.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu;
 
-/** Parses "1.234,56", "1,234.56", "45.00", "1.234" (thousands) into a number. */
+/**
+ * Parses "1.234,56", "1,234.56", "45.00", "4271.5" and "1.234" (thousands) into a number. One or two digits
+ * after the last separator make it decimal; exactly three make it a thousands separator.
+ */
 export function parseAmount(raw: string): number {
   const lastDot = raw.lastIndexOf(".");
   const lastComma = raw.lastIndexOf(",");
   const decimalSep = lastDot > lastComma ? "." : ",";
   const decimalIdx = Math.max(lastDot, lastComma);
-  const hasDecimal = decimalIdx >= 0 && raw.length - decimalIdx - 1 === 2;
+  const decimals = raw.length - decimalIdx - 1;
+  const hasDecimal = decimalIdx >= 0 && (decimals === 1 || decimals === 2);
   if (!hasDecimal) return Number(raw.replace(/[.,]/g, ""));
   const thousandsSep = decimalSep === "." ? "," : ".";
   return Number(raw.replaceAll(thousandsSep, "").replace(decimalSep, "."));

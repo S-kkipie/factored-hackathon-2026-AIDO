@@ -76,6 +76,10 @@ describe("helpers", () => {
     expect(parseAmount("45")).toBe(45);
     expect(parseAmount("45.00")).toBe(45);
     expect(parseAmount("1.234")).toBe(1234);
+    // Raw database values often carry one decimal (4271.5); that is a decimal, not a thousands separator.
+    expect(parseAmount("4271.5")).toBe(4271.5);
+    expect(parseAmount("9543242.5")).toBe(9543242.5);
+    expect(parseAmount("1.234,5")).toBe(1234.5);
   });
   test("detectLanguage separates Spanish and Portuguese", () => {
     expect(detectLanguage("¿Usted reconoce el cargo en su cuenta?")).toBe("es");
