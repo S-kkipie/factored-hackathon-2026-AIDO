@@ -52,6 +52,7 @@ if (import.meta.main) {
       repeat: { type: "string", default: "0" },
       "repeat-n": { type: "string", default: "20" },
       "baseline-share": { type: "string", default: "1" },
+      report: { type: "string" },
       max: { type: "string" },
     },
   });
@@ -132,7 +133,8 @@ if (import.meta.main) {
   mkdirSync(join(ROOT, "data/eval/runs"), { recursive: true });
   writeFileSync(join(ROOT, `data/eval/runs/${result.runId}.json`), JSON.stringify(result, null, 1));
   const md = renderReport(result);
-  writeFileSync(join(ROOT, split === "test" ? "reports/eval.md" : "reports/eval-dev.md"), md);
-  console.log(`\n${result.runId}: spend $${result.spendUsd.toFixed(4)} · report ${split === "test" ? "reports/eval.md" : "reports/eval-dev.md"}`);
+  const reportPath = values.report ?? (split === "test" ? "reports/eval.md" : "reports/eval-dev.md");
+  writeFileSync(join(ROOT, reportPath), md);
+  console.log(`\n${result.runId}: spend $${result.spendUsd.toFixed(4)} · report ${reportPath}`);
   proposed.close();
 }
