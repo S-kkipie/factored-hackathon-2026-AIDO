@@ -78,6 +78,42 @@ describe("read intents", () => {
   });
 });
 
+describe("structured view for the UI", () => {
+  const viewOf = (events: TurnEvent[]) =>
+    events.find((e): e is Extract<TurnEvent, { type: "view" }> => e.type === "view")?.view;
+  const FORBIDDEN = ["fraud_score", "customer_id", "response_code", "customer_note", "idempotency_key"];
+  const clean = (o: unknown) => {
+    const text = JSON.stringify(o);
+    for (const k of FORBIDDEN) expect(text).not.toContain(`"${k}"`);
+  };
+
+  test("a balance answer carries the customer's products, projected", async () => {
+    const h = await harness({ script: byPurpose({}, "x") });
+    const view = viewOf(await h.send("¿Cuál es mi saldo?"));
+    expect(view?.products?.map((p) => p.product_number_masked)).toEqual(["****1111"]);
+    clean(view);
+  });
+
+  test("a confirmation carries the transactions to confirm, then the created dispute", async () => {
+    const h = await harness({ script: byPurpose({ merchant: "Super Ahorro", amount: 45, reason: "unrecognized" }, "x") });
+    const ev = await h.send("No reconozco un cargo de 45 dólares en Super Ahorro");
+    expect(viewOf(ev)?.candidates?.map((t) => t.transaction_id)).toEqual([FIXTURE.txSmall]);
+    clean(viewOf(ev));
+    const it = interruptOf(ev)!;
+    const done = await h.resume(it.interruptId, it.nonce, true);
+    const view = viewOf(done);
+    expect(view?.dispute?.transaction_ids).toEqual([FIXTURE.txSmall]);
+    clean(view);
+  });
+
+  test("a handoff carries its reference and nothing else", async () => {
+    const h = await harness({ script: byPurpose({}, "x") });
+    const view = viewOf(await h.send("Quiero hablar con una persona"));
+    expect(view?.handoffId).toMatch(/^H-/);
+    expect(view?.transactions).toBeUndefined();
+  });
+});
+
 describe("dispute flow", () => {
   const disputeSlots = { merchant: "Super Ahorro", amount: 45, reason: "unrecognized", note: "no fui yo" };
 

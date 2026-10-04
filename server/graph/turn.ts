@@ -19,6 +19,7 @@ import type { Router } from "../router/types";
 import type { RuleId } from "../rules";
 import type { Tools } from "../tools";
 import { ToolError } from "../tools/runtime";
+import { type ModelDispute, type ModelProduct, type ModelTransaction, toModelDispute, toModelProduct, toModelTransaction } from "../tools/views";
 import { Tracer } from "../trace";
 import { buildGraph, type ConversationGraph } from "./build";
 import type { GraphDeps } from "./deps";
@@ -48,10 +49,40 @@ export type TurnEvent =
   | { type: "route"; label: string; confidence: number }
   | { type: "decision"; action: string; ruleIds: string[] }
   | { type: "message"; text: string }
+  | { type: "view"; view: TurnView }
   | { type: "interrupt"; interruptId: string; nonce: string; text: string; expiresAt: string }
   | { type: "done"; outcome: TurnOutcome; ruleIds: RuleId[] };
 
 export type CustomerSession = Session & { status: SessionStatus };
+
+/**
+ * Structured, display-only view of the records a reply is about, so the UI can render cards instead of parsing
+ * text. Built only from `db` records already scoped to the session customer, through the same field-by-field
+ * projections the model sees (no fraud_score, no customer ids, no untrusted notes).
+ */
+export interface TurnView {
+  products?: ModelProduct[];
+  transactions?: ModelTransaction[];
+  /** Transactions the customer is asked to choose between (clarify) or to confirm (dispute). */
+  candidates?: ModelTransaction[];
+  dispute?: ModelDispute;
+  handoffId?: string;
+}
+
+export function viewOf(values: TurnValues, pending: boolean): TurnView | null {
+  const r = values.results ?? {};
+  const view: TurnView = {};
+  if (r.products) view.products = r.products.v.map(toModelProduct);
+  if (r.transactions && values.outcome === "answered") view.transactions = r.transactions.v.map(toModelTransaction);
+  // A run can end without ever writing these channels: treat missing as empty.
+  const targets = values.targets ?? [];
+  const candidates = values.candidates ?? [];
+  if (pending) view.candidates = targets.map((t) => toModelTransaction(t.v));
+  else if (candidates.length > 1) view.candidates = candidates.map(toModelTransaction);
+  if (r.dispute && values.outcome === "dispute_created") view.dispute = toModelDispute(r.dispute.v);
+  if (values.handoffId) view.handoffId = values.handoffId;
+  return Object.keys(view).length > 0 ? view : null;
+}
 
 const NONCE_TTL_MS = 10 * 60_000;
 
@@ -121,6 +152,8 @@ export async function* drive(
   }
 
   const values = (await app.getState(cfg)).values as TurnValues;
+  const view = viewOf(values, pending !== null);
+  if (view) yield { type: "view", view };
   if (pending) {
     const nonce = await issueNonce(deps.ops, { sessionId, interruptId: pending.id, payload: pending.value.payload }, nowMs, NONCE_TTL_MS);
     await appendAudit(deps.ops, { sessionId, kind: "confirm_requested", payload: { interruptId: pending.id, ...pending.value.payload } });
