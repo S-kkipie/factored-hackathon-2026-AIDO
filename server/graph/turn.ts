@@ -8,6 +8,7 @@ import type { ServingDb } from "../db/serving";
 import { CallCounter, type CircuitBreaker, checkBudget, recordTurn } from "../gates/budget";
 import { injectionSignal } from "../gates/injection";
 import { inputGate } from "../gates/input";
+import type { PromptInspector } from "../gates/model-armor";
 import { consumeNonce, issueNonce } from "../gates/nonce";
 import { canonicalJson, sha256Hex } from "../hash";
 import { createGateway } from "../llm/gateway";
@@ -19,7 +20,7 @@ import type { Router } from "../router/types";
 import type { RuleId } from "../rules";
 import type { Tools } from "../tools";
 import { ToolError } from "../tools/runtime";
-import { Tracer } from "../trace";
+import { Tracer, type SpanSink } from "../trace";
 import { buildGraph, type ConversationGraph } from "./build";
 import type { GraphDeps } from "./deps";
 import { type ConfirmInterrupt, type Confirmation, type Outcome, type TurnValues, freshTurn } from "./state";
@@ -40,6 +41,10 @@ export interface TurnDeps {
   now?: () => Date;
   /** Offline-evaluation debug seam: receives model drafts the response gate rejected. Never set by the HTTP server. */
   onDraftRejected?: (draft: string, ruleIds: string[]) => void;
+  /** Optional span exporter (Langfuse OTLP); spans are always persisted to ops.sqlite. */
+  sink?: SpanSink;
+  /** Optional Model Armor inspector (inspect-only signal, spec 4.5). */
+  armor?: PromptInspector;
 }
 
 export type TurnOutcome = Outcome | "confirm" | "blocked" | "handed_off" | "confirmation_invalid";
@@ -66,7 +71,7 @@ function customerOf(session: CustomerSession) {
 }
 
 function graphFor(deps: TurnDeps, session: CustomerSession, turn: number, now: Date) {
-  const tracer = new Tracer(deps.ops, session.sessionId);
+  const tracer = new Tracer(deps.ops, session.sessionId, undefined, deps.sink);
   const gd: GraphDeps = {
     sessionId: session.sessionId,
     customerId: customerOf(session),
@@ -145,6 +150,8 @@ export async function* drive(
       expiresAt: new Date(nowMs + NONCE_TTL_MS).toISOString(),
     };
     yield { type: "done", outcome: "confirm", ruleIds: values.ruleIds };
+    // End-of-turn trace flush is best effort: fire-and-forget, never awaited into the response.
+    void deps.sink?.flush?.();
     return;
   }
   // Never send an empty message: a turn that produced no reply is answered with the clarify template.
@@ -160,6 +167,8 @@ export async function* drive(
     ...(caseId ? { caseId } : {}),
     ...(values.handoffId ? { handoffId: values.handoffId } : {}),
   };
+  // End-of-turn trace flush is best effort: fire-and-forget, never awaited into the response.
+  void deps.sink?.flush?.();
 }
 
 /**
@@ -193,6 +202,22 @@ function escalateDirect(deps: TurnDeps, session: CustomerSession, ruleId: RuleId
   } catch (e) {
     if (!(e instanceof ToolError)) throw e;
     appendAudit(deps.ops, { sessionId: session.sessionId, kind: "handoff", ruleId: e.ruleId, payload: {} });
+    return false;
+  }
+}
+
+/**
+ * Model Armor is an optional, inspect-only second opinion (spec 4.5): a flag or an error both become one audit
+ * event and the method never throws into the turn — any error (including a timeout) counts as "no signal".
+ */
+async function armorSignal(deps: TurnDeps, sessionId: string, text: string): Promise<boolean> {
+  if (!deps.armor) return false;
+  try {
+    const r = await deps.armor.inspect(text);
+    appendAudit(deps.ops, { sessionId, kind: "model_armor", payload: { flagged: r.flagged } });
+    return r.flagged;
+  } catch {
+    appendAudit(deps.ops, { sessionId, kind: "model_armor_error", payload: {} });
     return false;
   }
 }
@@ -282,7 +307,7 @@ async function* runTurnLocked(deps: TurnDeps, session: CustomerSession, text: st
   appendAudit(deps.ops, { sessionId: sid, kind: "input_gate", payload: { turn, pii: gate.piiFound } });
 
   const { app } = graphFor(deps, session, turn, now);
-  yield* drive(deps, app, sid, freshTurn(gate.text, lang, injectionSignal(gate.text)), now.getTime());
+  yield* drive(deps, app, sid, freshTurn(gate.text, lang, injectionSignal(gate.text) || (await armorSignal(deps, sid, gate.text))), now.getTime());
 }
 
 export interface ResumeInput {

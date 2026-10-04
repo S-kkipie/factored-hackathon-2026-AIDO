@@ -26,6 +26,10 @@ export interface ServerConfig {
   router: "auto" | "keyword" | "embed-lr";
   /** Built web app served by the API process (`WEB_DIR`, default `web/dist`); absent build means API only. */
   webDir: string;
+  /** Langfuse OTLP export target; `null` unless both key env vars are set, so export stays off by default. */
+  langfuse: { baseUrl: string; publicKey: string; secretKey: string } | null;
+  /** Google Model Armor template; `null` unless all three env vars are set, so the inspect-only signal stays off by default. */
+  modelArmor: { project: string; location: string; template: string } | null;
 }
 
 /** Parses a required-positive-integer env var, falling back when unset; throws a clear message otherwise. */
@@ -69,5 +73,13 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     llmTotalCapUsd: nonNegativeNumber("LLM_TOTAL_CAP_USD", env.LLM_TOTAL_CAP_USD, 3),
     router: routerChoice(env.ROUTER),
     webDir: env.WEB_DIR ?? join(ROOT, "web/dist"),
+    langfuse:
+      env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY
+        ? { baseUrl: env.LANGFUSE_BASE_URL ?? "https://cloud.langfuse.com", publicKey: env.LANGFUSE_PUBLIC_KEY, secretKey: env.LANGFUSE_SECRET_KEY }
+        : null,
+    modelArmor:
+      env.MODEL_ARMOR_PROJECT && env.MODEL_ARMOR_LOCATION && env.MODEL_ARMOR_TEMPLATE
+        ? { project: env.MODEL_ARMOR_PROJECT, location: env.MODEL_ARMOR_LOCATION, template: env.MODEL_ARMOR_TEMPLATE }
+        : null,
   };
 }
