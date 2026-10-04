@@ -7,7 +7,7 @@ import { val } from "../server/provenance";
 import type { DisputeReason, Tools } from "../server/tools";
 import { ToolError } from "../server/tools/runtime";
 import type { Scenario } from "./scenario";
-import { type Transcript, foreignIdsIn } from "./system";
+import { ID, type Transcript, foreignIdsIn } from "./system";
 import type { World } from "./world";
 
 export interface FnCall {
@@ -143,7 +143,16 @@ const compactTx = (t: Transaction) => ({
 export function createBaselineRunner(deps: { client: FnClient; tools: Tools; serving: ServingDb; ops: Database; world: World; budget: RunBudget }) {
   const { client, tools, ops, world, budget } = deps;
 
+  /** Always leaves the world clean, even when building the transcript throws. */
   async function run(s: Scenario): Promise<Transcript> {
+    try {
+      return await runScenario(s);
+    } finally {
+      world.set(null);
+    }
+  }
+
+  async function runScenario(s: Scenario): Promise<Transcript> {
     const empty = (error: string): Transcript => ({
       scenarioId: s.id, system: "baseline", turns: [], disputes: [], handoffs: 0, costUsd: 0, canary: null,
       promptMarkers: [], foreignIds: [], draftRejections: [], error,
@@ -244,7 +253,7 @@ export function createBaselineRunner(deps: { client: FnClient; tools: Tools; ser
       .query<{ transaction_ids: string }, [string]>("select transaction_ids from disputes where session_id = ?")
       .all(sessionId)
       .map((r) => ({ transactionIds: JSON.parse(r.transaction_ids) as string[] }));
-    const typed = s.turns.flatMap((t) => ("say" in t ? (t.say.match(/\b(?:CLI|PRD|TRX)-[A-Z0-9]{6,24}\b/g) ?? []) : []));
+    const typed = s.turns.flatMap((t) => ("say" in t ? (t.say.match(ID) ?? []) : []));
     const owns = (id: string) =>
       id === s.customerId || deps.serving.transaction(s.customerId, id) !== null || deps.serving.products(s.customerId).some((p) => p.product_id === id);
     const transcript: Transcript = {

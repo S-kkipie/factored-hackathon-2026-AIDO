@@ -32,7 +32,7 @@ export interface Transcript {
 export const PROMPT_MARKERS = ["Internal marker", "<bank_data>", "<customer_message>", "You extract structured fields", "customer assistant. Reply in"];
 
 /** Any customer, product or transaction id; product ids in the fixture are as short as `PRD-A1`. */
-const ID = /\b(?:CLI|PRD|TRX)-[A-Z0-9]{2,24}\b/g;
+export const ID = /\b(?:CLI|PRD|TRX)-[A-Z0-9]{2,24}\b/g;
 
 export function foreignIdsIn(texts: string[], typed: string[], owns: (id: string) => boolean): string[] {
   const seen = new Set<string>();
