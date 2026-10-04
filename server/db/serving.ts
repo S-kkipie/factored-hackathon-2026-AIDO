@@ -75,6 +75,9 @@ export interface ServingDb {
   close(): void;
 }
 
+/** Case- and accent-insensitive form for merchant matching ("Óptica Visión" → "optica vision"). */
+export const foldText = (t: string): string => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
 const TX_COLUMNS = `transaction_id, transaction_date, product_id, customer_id, transaction_type, transaction_category,
   amount, currency, amount_usd, channel, merchant_name, merchant_category, transaction_country, transaction_city,
   transaction_status, response_code, fraud_score`;
@@ -98,7 +101,9 @@ export function openServing(path: string): ServingDb {
         .all(customerId),
     transactions(customerId, filter = {}) {
       const where = ["customer_id = $customer"];
-      const params: Params = { $customer: customerId, $limit: filter.limit ?? 50 };
+      const limit = filter.limit ?? 50;
+      // A merchant filter is applied in JS (below), so SQL must not cut the rows first: -1 = no limit in SQLite.
+      const params: Params = { $customer: customerId, $limit: filter.merchant ? -1 : limit };
       if (filter.from) {
         where.push("transaction_date >= $from");
         params.$from = filter.from;
@@ -106,10 +111,6 @@ export function openServing(path: string): ServingDb {
       if (filter.to) {
         where.push("transaction_date < $to");
         params.$to = filter.to;
-      }
-      if (filter.merchant) {
-        where.push("lower(merchant_name) like $merchant");
-        params.$merchant = `%${filter.merchant.toLowerCase()}%`;
       }
       if (filter.minUsd !== undefined) {
         where.push("amount_usd >= $minUsd");
@@ -119,11 +120,16 @@ export function openServing(path: string): ServingDb {
         where.push("amount_usd <= $maxUsd");
         params.$maxUsd = filter.maxUsd;
       }
-      return db
+      const rows = db
         .query<Transaction, Params>(
           `select ${TX_COLUMNS} from transactions where ${where.join(" and ")} order by transaction_date desc limit $limit`,
         )
         .all(params);
+      if (!filter.merchant) return rows;
+      // SQLite's lower()/LIKE only fold ASCII, so "Óptica Visión" never matched "óptica visión": compare with
+      // accents and case folded in JS instead.
+      const wanted = foldText(filter.merchant);
+      return rows.filter((r) => r.merchant_name !== null && foldText(r.merchant_name).includes(wanted)).slice(0, limit);
     },
     transaction: (customerId, transactionId) =>
       db

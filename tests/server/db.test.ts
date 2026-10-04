@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { openServing } from "../../server/db/serving";
 import { FIXTURE, makeOps, makeServing } from "./fixtures";
@@ -17,6 +18,18 @@ describe("openServing", () => {
     expect(large).toEqual([FIXTURE.txLarge]);
     const june = serving.transactions(FIXTURE.normal, { from: "2026-06-11", to: "2026-06-13" });
     expect(june.map((t) => t.transaction_id)).toEqual([FIXTURE.txFraud, FIXTURE.txLarge]);
+  });
+
+  test("merchant matching ignores accents and case, and the limit applies after matching", () => {
+    const path = makeServing();
+    const w = new Database(path);
+    w.exec(`insert into transactions values ('TRX-OPTICA0000000000009', '2026-06-13T21:51:05', 'PRD-A1', '${FIXTURE.normal}', 'Purchase',
+      'Health', 479.99, 'USD', 479.99, 'POS', 'Óptica Visión', 'Health', 'México', 'CDMX', 'Approved', '00', 3, 't.csv', 'L1')`);
+    w.close();
+    const s = openServing(path);
+    for (const q of ["Óptica Visión", "óptica visión", "Optica Vision", "OPTICA"])
+      expect(s.transactions(FIXTURE.normal, { merchant: q }).map((t) => t.transaction_id)).toEqual(["TRX-OPTICA0000000000009"]);
+    expect(s.transactions(FIXTURE.normal, { merchant: "ahorro", limit: 1 }).map((t) => t.transaction_id)).toEqual([FIXTURE.txPending]);
   });
 
   test("returns products, complaints and demo users", () => {
