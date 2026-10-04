@@ -24,6 +24,8 @@ export interface ServerConfig {
   llmTotalCapUsd: number;
   /** `ROUTER`: auto (experiment's selection), keyword or embed-lr. */
   router: "auto" | "keyword" | "embed-lr";
+  /** Built web app served by the API process (`WEB_DIR`, default `web/dist`); absent build means API only. */
+  webDir: string;
 }
 
 /** Parses a required-positive-integer env var, falling back when unset; throws a clear message otherwise. */
@@ -66,5 +68,6 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
     spendLedgerPath: env.SPEND_LEDGER_PATH ?? join(ROOT, "data/spend-ledger.sqlite"),
     llmTotalCapUsd: nonNegativeNumber("LLM_TOTAL_CAP_USD", env.LLM_TOTAL_CAP_USD, 3),
     router: routerChoice(env.ROUTER),
+    webDir: env.WEB_DIR ?? join(ROOT, "web/dist"),
   };
 }

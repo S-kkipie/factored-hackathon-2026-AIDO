@@ -4,10 +4,13 @@ import { sseResponse, startRun, toAgui } from "./api/agui";
 import { appendAudit } from "./audit";
 import { type Auth, AuthError, type SessionStatus } from "./auth";
 import type { TurnDeps } from "./graph/turn";
+import { webHandler } from "./static";
 import { listSpans } from "./trace";
 
 export interface AppDeps extends TurnDeps {
   auth: Auth;
+  /** Directory of the built web app; when absent or unbuilt, only the API is served. */
+  webDir?: string;
 }
 
 const json = (status: number, body: unknown) =>
@@ -34,6 +37,7 @@ export function createApp(deps: AppDeps) {
     if (r.session.role !== "agent") return { error: json(403, { ruleId: "IN_ROLE" }) };
     return r;
   };
+  const web = deps.webDir ? webHandler(deps.webDir) : null;
 
   return new Elysia()
     .onError(({ code, error }) => {
@@ -45,6 +49,12 @@ export function createApp(deps: AppDeps) {
       return json(500, { error: "internal" });
     })
     .get("/api/health", () => ({ ok: true }))
+    .get("/api/session", async ({ request }) => {
+      const r = await authed(request, ["active", "handed_off"]);
+      if ("error" in r) return r.error;
+      const s = r.session;
+      return { sessionId: s.sessionId, role: s.role, language: s.language, status: s.status, expiresAt: s.expiresAt };
+    })
     .get("/api/demo-users", () => deps.serving.demoUsers().map((u) => ({ persona: u.persona })))
     .post(
       "/api/auth/login",
@@ -140,7 +150,9 @@ export function createApp(deps: AppDeps) {
       if ("error" in r) return r.error;
       if (r.session.role !== "agent" && r.session.sessionId !== params.session) return json(403, { ruleId: "IN_ROLE" });
       return listSpans(deps.ops, params.session);
-    });
+    })
+    // The built web app (spec 9 routes) is served by the same process; `/api/*` misses stay JSON 404s.
+    .get("/*", ({ request }) => web?.(new URL(request.url).pathname) ?? json(404, { error: "not_found" }));
 }
 
 export type App = ReturnType<typeof createApp>;

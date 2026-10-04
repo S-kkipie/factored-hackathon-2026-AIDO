@@ -37,6 +37,11 @@ const traced =
       const update = await fn(s);
       if (update.ruleIds) set("bank.rule_ids", [...update.ruleIds]);
       if (update.decision) set("bank.gate.decision", update.decision.action);
+      if (update.route) {
+        set("bank.router.label", update.route.label);
+        set("bank.router.confidence", update.route.confidence);
+        set("bank.router.name", update.route.router);
+      }
       return update;
     });
 

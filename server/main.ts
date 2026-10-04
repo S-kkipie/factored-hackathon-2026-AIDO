@@ -46,6 +46,7 @@ export function createServer(env: Record<string, string | undefined> = process.e
     breaker: new CircuitBreaker({ failureThreshold: 3, cooldownMs: 30_000 }),
     checkpointer: new BunSqliteSaver(ops),
     ledger,
+    webDir: cfg.webDir,
   });
   return { cfg, app, llm, ledger, routing };
 }

@@ -83,6 +83,8 @@ export async function* toAgui(input: RunInput, events: AsyncIterable<TurnEvent>)
             delta: [
               { op: "add", path: "/outcome", value: e.outcome },
               { op: "add", path: "/ruleIds", value: e.ruleIds },
+              ...(e.caseId ? [{ op: "add", path: "/caseId", value: e.caseId }] : []),
+              ...(e.handoffId ? [{ op: "add", path: "/handoffId", value: e.handoffId }] : []),
             ],
           } as BaseEvent;
           break;

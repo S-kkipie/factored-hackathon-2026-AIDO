@@ -49,7 +49,7 @@ export type TurnEvent =
   | { type: "decision"; action: string; ruleIds: string[] }
   | { type: "message"; text: string }
   | { type: "interrupt"; interruptId: string; nonce: string; text: string; expiresAt: string }
-  | { type: "done"; outcome: TurnOutcome; ruleIds: RuleId[] };
+  | { type: "done"; outcome: TurnOutcome; ruleIds: RuleId[]; caseId?: string; handoffId?: string };
 
 export type CustomerSession = Session & { status: SessionStatus };
 
@@ -136,7 +136,15 @@ export async function* drive(
   }
   yield { type: "message", text: values.reply };
   // A graph that ended without ever setting an outcome is not a success; default to a safe clarify, not answered.
-  yield { type: "done", outcome: values.outcome ?? "clarify", ruleIds: values.ruleIds };
+  const outcome = values.outcome ?? "clarify";
+  const caseId = outcome === "dispute_created" ? values.results.dispute?.v.dispute_id : undefined;
+  yield {
+    type: "done",
+    outcome,
+    ruleIds: values.ruleIds,
+    ...(caseId ? { caseId } : {}),
+    ...(values.handoffId ? { handoffId: values.handoffId } : {}),
+  };
 }
 
 /**
