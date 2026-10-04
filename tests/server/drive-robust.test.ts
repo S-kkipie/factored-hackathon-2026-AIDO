@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type { CheckpointTuple } from "@langchain/langgraph-checkpoint";
 import { BunSqliteSaver } from "../../server/graph/checkpointer";
-import { doneOf, harness, messageOf } from "./graph-harness";
+import { doneOf, harness, interruptOf, messageOf } from "./graph-harness";
+import { byPurpose } from "./llm-fake";
 
 /**
  * A saver whose "latest" read (no checkpoint_id) returns the thread's oldest checkpoint, as a stale or
@@ -31,5 +32,30 @@ describe("turn result does not depend on a fresh post-run state read", () => {
     const h = await harness();
     const events = await h.send("Quiero hablar con un agente");
     expect(messageOf(events).trim().length).toBeGreaterThan(0);
+  });
+});
+
+/** Persists checkpoints a little late, like a slow disk: the graph must not finish a run before they land. */
+class SlowPutSaver extends BunSqliteSaver {
+  override async put(...args: Parameters<BunSqliteSaver["put"]>) {
+    await Bun.sleep(30);
+    return super.put(...args);
+  }
+  override async putWrites(...args: Parameters<BunSqliteSaver["putWrites"]>) {
+    await Bun.sleep(30);
+    return super.putWrites(...args);
+  }
+}
+
+describe("checkpoints are durable before a run returns", () => {
+  test("a dispute confirmation resumes even when checkpoint writes are slow", async () => {
+    const h = await harness({ script: byPurpose({ merchant: "Super Ahorro", amount: 45, reason: "unrecognized" }, "x") });
+    h.deps.checkpointer = new SlowPutSaver(h.ops);
+    const first = await h.send("No reconozco un cargo de 45 dólares en Super Ahorro");
+    const it = interruptOf(first)!;
+    expect(it).toBeTruthy();
+    const done = await h.resume(it.interruptId, it.nonce, true);
+    expect(doneOf(done).outcome).toBe("dispute_created");
+    expect(h.disputes().length).toBe(1);
   });
 });

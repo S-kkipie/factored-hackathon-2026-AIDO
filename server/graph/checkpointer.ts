@@ -93,7 +93,9 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
           .get(thread_id, checkpoint_ns, String(checkpoint_id))
       : this.db
           .query<CheckpointRow, [string, string]>(
-            "select * from checkpoints where thread_id = ? and checkpoint_ns = ? order by checkpoint_id desc limit 1",
+            // Latest = last written (rowid), not the greatest id: LangGraph's uuid6 ids embed wall-clock time, and a
+            // clock step back (seen under WSL during an LLM call) made a newer checkpoint sort before an older one.
+            "select * from checkpoints where thread_id = ? and checkpoint_ns = ? order by rowid desc limit 1",
           )
           .get(thread_id, checkpoint_ns);
     return row ? this.toTuple(row) : undefined;
@@ -113,10 +115,11 @@ export class BunSqliteSaver extends BaseCheckpointSaver {
     }
     const before = options?.before?.configurable?.checkpoint_id;
     if (before !== undefined) {
-      where.push("checkpoint_id < ?");
+      where.push("rowid < coalesce((select b.rowid from checkpoints b where b.checkpoint_id = ? and b.thread_id = checkpoints.thread_id and b.checkpoint_ns = checkpoints.checkpoint_ns), -1)");
       args.push(String(before));
     }
-    const sql = `select * from checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by checkpoint_id desc`;
+    // Newest first by write order (see getTuple).
+    const sql = `select * from checkpoints ${where.length ? `where ${where.join(" and ")}` : ""} order by rowid desc`;
     let yielded = 0;
     const limit = options?.limit ? Math.max(1, Math.trunc(options.limit)) : undefined;
     for (const row of this.db.query<CheckpointRow, string[]>(sql).all(...args)) {

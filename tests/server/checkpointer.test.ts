@@ -59,8 +59,8 @@ describe("BunSqliteSaver", () => {
     const all = [];
     for await (const t of saver.list({ configurable: { thread_id: "t" } })) all.push(t);
     expect(all.length).toBeGreaterThan(1);
-    const ids = all.map((t) => String(t.config.configurable?.checkpoint_id));
-    expect([...ids].sort().reverse()).toEqual(ids);
+    const steps = all.map((t) => Number((t.metadata as { step?: number } | undefined)?.step));
+    expect([...steps].sort((x, y) => y - x)).toEqual(steps);
     const limited = [];
     for await (const t of saver.list({ configurable: { thread_id: "t" } }, { limit: 1 })) limited.push(t);
     expect(limited.length).toBe(1);
@@ -104,4 +104,25 @@ describe("BunSqliteSaver", () => {
     // Error write should have second value (insert or replace)
     expect(errorWrite?.[2]).toEqual({ message: "second" });
   });
+
+  test("latest means last written, even when checkpoint ids are not time-ordered (wall clock stepped back)", async () => {
+    const db = openOps(":memory:");
+    const saver = new BunSqliteSaver(db);
+    const cfg = { configurable: { thread_id: "t", checkpoint_ns: "" } };
+    // Ids as observed in a real run after the WSL clock stepped back: step 2 sorts before step 1.
+    const ids = ["1f1bfa00-d300-6741-ffff-14dd5872314f", "1f1bfa00-d735-61d0-8001-9dbfbf087b65", "1f1bfa00-d068-6640-8002-e22f1b1c692a"] as const;
+    let parent: typeof cfg & { configurable: { checkpoint_id?: string } } = cfg;
+    for (const [step, id] of ids.entries()) {
+      const next = await saver.put(parent, { ...emptyCheckpoint(), id }, { source: "loop", step, parents: {} }, {});
+      parent = next as typeof parent;
+    }
+    expect((await saver.getTuple(cfg))?.config.configurable?.checkpoint_id).toBe(ids[2]);
+    const listed = [];
+    for await (const t of saver.list(cfg)) listed.push(String(t.config.configurable?.checkpoint_id));
+    expect(listed).toEqual([ids[2], ids[1], ids[0]]);
+    const before = [];
+    for await (const t of saver.list(cfg, { before: { configurable: { checkpoint_id: ids[2] } } })) before.push(String(t.config.configurable?.checkpoint_id));
+    expect(before).toEqual([ids[1], ids[0]]);
+  });
 });
+
