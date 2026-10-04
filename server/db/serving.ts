@@ -75,7 +75,7 @@ export interface ServingDb {
   close(): void;
 }
 
-/** Case- and accent-insensitive form for merchant matching ("Óptica Visión" → "optica vision"). */
+/** Case- and accent-insensitive form for merchant matching ("Café Ñandú" → "cafe nandu"). */
 export const foldText = (t: string): string => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 const TX_COLUMNS = `transaction_id, transaction_date, product_id, customer_id, transaction_type, transaction_category,
@@ -126,7 +126,7 @@ export function openServing(path: string): ServingDb {
         )
         .all(params);
       if (!filter.merchant) return rows;
-      // SQLite's lower()/LIKE only fold ASCII, so "Óptica Visión" never matched "óptica visión": compare with
+      // SQLite's lower()/LIKE only fold ASCII, so "Café Ñandú" never matched "café ñandú": compare with
       // accents and case folded in JS instead.
       const wanted = foldText(filter.merchant);
       return rows.filter((r) => r.merchant_name !== null && foldText(r.merchant_name).includes(wanted)).slice(0, limit);

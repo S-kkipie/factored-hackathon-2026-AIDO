@@ -111,8 +111,13 @@ export async function* drive(
   let pending: { id: string; value: ConfirmInterrupt } | null = null;
   // Every state field is last-value, so the updates streamed by this run are the authoritative result of the
   // turn. The post-run snapshot only fills fields this run did not write: a stale or misordered latest-checkpoint
-  // read (seen once in evaluation) must never turn a completed handoff into an empty "clarify".
+  // read (seen once in evaluation) must never turn a completed handoff into an empty "clarify". When this run
+  // starts from a fresh turn object (not a resume Command), that object is the complete reset for every field
+  // this turn did not touch, so it seeds `written` before any streamed update: otherwise a field no node in this
+  // run assigns (e.g. `handoffId` on a plain answered turn) would fall through to the stale snapshot below and
+  // could carry a previous turn's value into this one.
   const written: Partial<TurnValues> = {};
+  if (!(input instanceof Command)) Object.assign(written, input);
   for await (const chunk of await app.stream(input, { ...cfg, streamMode: "updates" })) {
     for (const [node, update] of Object.entries(chunk as Record<string, unknown>)) {
       if (node === "__interrupt__") {

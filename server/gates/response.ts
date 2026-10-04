@@ -66,7 +66,7 @@ const NOT_MONEY: RegExp[] = [
 const BARE_NUMBER = /(?<![\p{L}\d.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu;
 
 /**
- * Parses "1.234,56", "1,234.56", "45.00", "4271.5" and "1.234" (thousands) into a number. One or two digits
+ * Parses "1.234,56", "1,234.56", "45.00", "1234.5" and "1.234" (thousands) into a number. One or two digits
  * after the last separator make it decimal; exactly three make it a thousands separator.
  */
 export function parseAmount(raw: string): number {
