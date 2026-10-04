@@ -1,13 +1,12 @@
 import { Link, Outlet } from "@tanstack/react-router";
+import { Logo } from "./Brand";
 
 export function Layout() {
   return (
     <div className="app">
       <header className="topbar">
         <Link to="/login" className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            LB
-          </span>
+          <Logo size={32} />
           <span>
             LATAM Bank <span className="muted">· AIDO</span>
           </span>
