@@ -17,4 +17,5 @@ docs/*
 .superpowers/
 reports/eval-dev.md
 redteam/output/
+redteam/redteam.yaml
 .promptfoo/
