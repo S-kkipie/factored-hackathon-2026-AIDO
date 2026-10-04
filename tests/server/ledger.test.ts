@@ -23,6 +23,11 @@ describe("SpendLedger", () => {
     expect(b.allows(0.007)).toBe(false);
   });
 
+  test("creates a missing parent directory", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "aido-ledger-")), "nested", "dir", "spend.sqlite");
+    expect(new SpendLedger(path, 1).total()).toBe(0);
+  });
+
   test("rejects invalid caps", () => {
     expect(() => new SpendLedger(tmpLedger(), Number.NaN)).toThrow();
     expect(() => new SpendLedger(tmpLedger(), -1)).toThrow();

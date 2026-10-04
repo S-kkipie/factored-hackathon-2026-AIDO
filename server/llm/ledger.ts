@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 export interface SpendMeta {
   model: string;
@@ -19,6 +21,8 @@ export class SpendLedger {
     readonly capUsd: number,
   ) {
     if (!Number.isFinite(capUsd) || capUsd < 0) throw new Error(`invalid LLM spend cap: ${capUsd}`);
+    // A fresh clone has no data/ directory (e.g. when the server uses Supabase instead of local files).
+    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path, { create: true });
     this.db.exec(
       "create table if not exists llm_spend (at text not null, usd real not null, model text not null, purpose text not null, source text not null)",
