@@ -1,6 +1,7 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, type Span, api } from "../api";
+import { Wordmark } from "../components/Brand";
 import { session } from "../session";
 
 interface Turn {
@@ -69,7 +70,7 @@ export function TracePage() {
     <div className="trace-layout">
       <header className="topbar">
         <div className="brand small">
-          <strong>Traza</strong>
+          <Wordmark size={28} sub="Traza de sesión" />
           <span className="chip mono">{sessionId.slice(0, 8)}…</span>
           {spans && (
             <>

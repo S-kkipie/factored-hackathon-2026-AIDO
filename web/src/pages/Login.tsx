@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 import { ApiError, type Language, api } from "../api";
+import { Wordmark } from "../components/Brand";
 import { strings } from "../i18n";
 import { session } from "../session";
 
@@ -22,11 +23,9 @@ export function LoginPage() {
       .then((users) => {
         const names = users.map((u) => u.persona).sort((a, b) => PERSONA_ORDER.indexOf(a) - PERSONA_ORDER.indexOf(b));
         setPersonas(names);
-        if (names.length && !names.includes(persona)) setPersona(names[0]!);
+        setPersona((p) => (names.includes(p) ? p : (names[0] ?? p)));
       })
       .catch(() => setError(strings.es.serverDown));
-    // Load once; the persona default only matters if "normal" is missing from the data.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit(e: FormEvent) {
@@ -45,21 +44,36 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login">
-      <section className="login-card">
-        <header className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" width="28" height="28">
-              <path d="M9 22 16 9l7 13" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <div>
-            <h1>LATAM Bank</h1>
-            <p className="muted">{t.tagline}</p>
+    <main className="auth">
+      <section className="auth-hero" aria-hidden="true">
+        <Wordmark size={40} sub={t.brandTagline} />
+        <div className="hero-copy">
+          <h1>{t.loginTitle}</h1>
+          <p>{t.loginSubtitle}</p>
+        </div>
+        <div className="hero-preview">
+          <div className="preview-bubble user">{t.suggestions[2]}</div>
+          <div className="preview-bubble assistant">
+            <span className="preview-dot" />
+            {language === "es" ? "Encontré el movimiento. Confirme con el botón para registrar la disputa." : "Encontrei a movimentação. Confirme no botão para registrar a contestação."}
           </div>
-        </header>
+        </div>
+        <p className="hero-foot">{t.demoNote}</p>
+      </section>
 
-        <form onSubmit={submit} className="stack">
+      <section className="auth-panel">
+        <form onSubmit={submit} className="auth-form">
+          <div className="auth-head">
+            <h2>{t.signIn}</h2>
+            <div className="segmented" role="radiogroup" aria-label={t.language}>
+              {(["es", "pt"] as const).map((l) => (
+                <button key={l} type="button" role="radio" aria-checked={language === l} className={language === l ? "on" : ""} onClick={() => setLanguage(l)}>
+                  {l === "es" ? "ES" : "PT"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <fieldset className="personas">
             <legend>{t.chooseCustomer}</legend>
             {personas.map((p) => (
@@ -71,19 +85,10 @@ export function LoginPage() {
             ))}
           </fieldset>
 
-          <div className="row">
-            <label className="field">
-              <span>{t.language}</span>
-              <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-                <option value="es">Español</option>
-                <option value="pt">Português</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>{t.pin}</span>
-              <input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" maxLength={12} autoComplete="off" />
-            </label>
-          </div>
+          <label className="field">
+            <span>{t.pin}</span>
+            <input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" type="password" maxLength={12} autoComplete="off" />
+          </label>
 
           {error && (
             <p className="error" role="alert">
@@ -91,15 +96,14 @@ export function LoginPage() {
             </p>
           )}
 
-          <button className="primary" type="submit" disabled={busy || personas.length === 0}>
+          <button className="primary big" type="submit" disabled={busy || personas.length === 0}>
             {busy ? t.signingIn : t.signIn}
           </button>
-        </form>
 
-        <footer className="login-footer">
-          <Link to="/agent">{t.agentConsole} →</Link>
-          <span className="muted small">Synthetic data · Factored AI &amp; Data Hackathon 2026</span>
-        </footer>
+          <div className="auth-foot">
+            <Link to="/agent">{t.agentConsole} →</Link>
+          </div>
+        </form>
       </section>
     </main>
   );

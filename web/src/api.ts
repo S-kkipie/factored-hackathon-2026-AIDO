@@ -162,3 +162,45 @@ export async function* runAgent(token: string, sessionId: string, body: RunBody,
     }
   }
 }
+
+// ── Structured turn view (STATE_DELTA /view): display-only projections of the customer's own db records ──────
+
+export interface ViewProduct {
+  product_id: string;
+  product_type: string;
+  product_number_masked: string;
+  currency: string;
+  current_balance: number;
+  credit_limit: number | null;
+  product_status: string;
+}
+
+export interface ViewTransaction {
+  transaction_id: string;
+  transaction_date: string;
+  merchant_name: string | null;
+  amount: number;
+  currency: string;
+  amount_usd: number | null;
+  transaction_status: string;
+  channel: string;
+  transaction_type: string;
+  transaction_category: string | null;
+}
+
+export interface ViewDispute {
+  dispute_id: string;
+  transaction_ids: string[];
+  reason: string;
+  amount_usd: number;
+  status: string;
+  created_at: string;
+}
+
+export interface TurnView {
+  products?: ViewProduct[];
+  transactions?: ViewTransaction[];
+  candidates?: ViewTransaction[];
+  dispute?: ViewDispute;
+  handoffId?: string;
+}
