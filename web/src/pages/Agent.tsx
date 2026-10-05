@@ -12,7 +12,7 @@ type Filter = "all" | "queued" | "mine";
 const QUICK_REPLIES = [
   "Hola, soy del equipo de AIDO y ya revisé su caso.",
   "¿Puede confirmarme si reconoce el comercio y la fecha del cargo?",
-  "Por seguridad, bloqueamos preventivamente su tarjeta. Le enviaremos una nueva.",
+  "Si sospecha un uso indebido de su tarjeta, le recomendamos bloquearla por los canales oficiales de AIDO.",
   "Su caso quedó registrado. Le escribiremos por este medio con la resolución.",
 ];
 

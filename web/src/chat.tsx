@@ -41,6 +41,19 @@ export function ChatProvider({ session: s, children }: { session: CustomerSessio
 
   const push = useCallback((line: Omit<Line, "id" | "at">) => setLines((ls) => [...ls, { ...line, id: crypto.randomUUID(), at: new Date() }]), []);
 
+  // After a reload the thread is gone but the case may still be with an agent: resume the poll, which also
+  // brings back the agent's earlier messages.
+  useEffect(() => {
+    api
+      .session(s.token)
+      .then((r) => {
+        if (r.status === "handed_off") setHandoffId((h) => h ?? "—");
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 401) setExpired(true);
+      });
+  }, [s.token]);
+
   // While a human holds the case, their replies arrive over a plain poll (the agent console is REST).
   useEffect(() => {
     if (!handoffId) return;

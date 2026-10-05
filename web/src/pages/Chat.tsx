@@ -176,7 +176,7 @@ export function ChatPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
-          placeholder={handoffId ? t.placeholderAgent : t.placeholder}
+          placeholder={handoffId ? t.placeholderAgent : pending ? t.placeholderPending : t.placeholder}
           maxLength={1000}
           rows={1}
           disabled={expired}

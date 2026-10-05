@@ -54,6 +54,7 @@ const es = {
   empty: "Consulte su saldo, revise movimientos o reporte un cargo que no reconoce.",
   placeholder: "Escriba su mensaje…",
   placeholderAgent: "Escriba un mensaje para el agente…",
+  placeholderPending: "Confirme con los botones, o escriba otra consulta…",
   send: "Enviar",
   logout: "Cerrar sesión",
   thinking: "Aida está escribiendo",
@@ -69,7 +70,7 @@ const es = {
   backToAssistant: "El agente cerró su caso. Aida vuelve a atenderle.",
   agent: "Agente AIDO",
   disclaimer: "Aida nunca le pedirá contraseñas, claves ni el número completo de su tarjeta.",
-  suggestions: ["¿Cuál es mi saldo?", "Muéstrame mis últimos movimientos", "No reconozco un cargo de 45 dólares en Super Ahorro", "Quiero hablar con una persona"],
+  suggestions: ["¿Cuál es mi saldo?", "Muéstrame mis últimos movimientos", "No reconozco un cargo en mi cuenta", "Quiero hablar con una persona"],
   steps: {
     router: "Entendiendo su consulta",
     greet: "Aida está escribiendo",
@@ -156,6 +157,7 @@ const pt: typeof es = {
   empty: "Consulte seu saldo, veja o extrato ou informe uma cobrança que você não reconhece.",
   placeholder: "Digite sua mensagem…",
   placeholderAgent: "Digite uma mensagem para o atendente…",
+  placeholderPending: "Confirme pelos botões ou digite outra pergunta…",
   send: "Enviar",
   logout: "Sair",
   thinking: "Aida está digitando",
@@ -171,7 +173,7 @@ const pt: typeof es = {
   backToAssistant: "O atendente encerrou seu caso. A Aida volta a atender você.",
   agent: "Atendente AIDO",
   disclaimer: "A Aida nunca pedirá senhas nem o número completo do seu cartão.",
-  suggestions: ["Qual é o meu saldo?", "Quero ver meu extrato", "Não reconheço uma cobrança de 45 dólares no Super Ahorro", "Quero falar com uma pessoa"],
+  suggestions: ["Qual é o meu saldo?", "Quero ver meu extrato", "Não reconheço uma cobrança na minha conta", "Quero falar com uma pessoa"],
   steps: {
     router: "Entendendo sua mensagem",
     greet: "Aida está digitando",
