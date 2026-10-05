@@ -1,25 +1,26 @@
-import { createApi, type Language } from "./lib/api";
+import type { Language } from "./api";
 
-export interface StoredCustomer {
+/** Per-tab session (sessionStorage): a demo token lives 15 minutes and never needs to outlive the tab. */
+export interface CustomerSession {
   token: string;
   sessionId: string;
-  language: Language;
   persona: string;
+  language: Language;
   expiresAt: number;
 }
 
-export interface StoredAgent {
+export interface AgentSession {
   token: string;
   sessionId: string;
   expiresAt: number;
 }
-
-const KEYS = { customer: "aido.customer", agent: "aido.agent" } as const;
 
 function read<T>(key: string): T | null {
   try {
     const raw = sessionStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    if (!raw) return null;
+    const v = JSON.parse(raw) as T & { expiresAt: number };
+    return v.expiresAt > Date.now() ? v : null;
   } catch {
     return null;
   }
@@ -27,26 +28,25 @@ function read<T>(key: string): T | null {
 
 function write(key: string, value: unknown): void {
   try {
-    sessionStorage.setItem(key, JSON.stringify(value));
+    if (value === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage unavailable (private mode, blocked): the session lasts until reload.
+    // Storage unavailable (private mode): the session lives only in memory for this page.
   }
 }
 
-function clear(key: string): void {
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-    // Nothing stored to clear.
-  }
-}
+let memoryCustomer: CustomerSession | null = null;
+let memoryAgent: AgentSession | null = null;
 
-export const readCustomer = () => read<StoredCustomer>(KEYS.customer);
-export const writeCustomer = (s: StoredCustomer) => write(KEYS.customer, s);
-export const clearCustomer = () => clear(KEYS.customer);
-export const readAgent = () => read<StoredAgent>(KEYS.agent);
-export const writeAgent = (s: StoredAgent) => write(KEYS.agent, s);
-export const clearAgent = () => clear(KEYS.agent);
-
-export const customerApi = createApi({ token: () => readCustomer()?.token ?? null });
-export const agentApi = createApi({ token: () => readAgent()?.token ?? null });
+export const session = {
+  customer: (): CustomerSession | null => read<CustomerSession>("aido.customer") ?? (memoryCustomer && memoryCustomer.expiresAt > Date.now() ? memoryCustomer : null),
+  setCustomer: (s: CustomerSession | null) => {
+    memoryCustomer = s;
+    write("aido.customer", s);
+  },
+  agent: (): AgentSession | null => read<AgentSession>("aido.agent") ?? (memoryAgent && memoryAgent.expiresAt > Date.now() ? memoryAgent : null),
+  setAgent: (s: AgentSession | null) => {
+    memoryAgent = s;
+    write("aido.agent", s);
+  },
+};

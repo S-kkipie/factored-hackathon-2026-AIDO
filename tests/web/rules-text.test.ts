@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
 import { RULE_IDS } from "../../server/rules";
-import { RULE_TEXT, ruleText } from "../../web/src/lib/rules-text";
+import { RULE_TEXT } from "../../web/src/rules";
 
-test("every rule id has a description, and unknown ids fall back to the id", () => {
-  for (const id of RULE_IDS) expect(RULE_TEXT[id].length).toBeGreaterThan(5);
-  expect(ruleText("POL_HUMAN")).toBe(RULE_TEXT.POL_HUMAN);
-  expect(ruleText("XX_UNKNOWN")).toBe("XX_UNKNOWN");
+test("every rule id the server can emit has a description in the UI", () => {
+  const missing = RULE_IDS.filter((id) => (RULE_TEXT[id]?.length ?? 0) <= 5);
+  expect(missing).toEqual([]);
 });
