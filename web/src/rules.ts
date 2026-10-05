@@ -1,6 +1,6 @@
 /** Human-readable meaning of the rule ids agents see on a handoff card (server/rules.ts is the source of truth). */
 export const RULE_TEXT: Record<string, string> = {
-  POL_DSP_FRAUD: "Posible fraude (fraud_score ≥ 30). Evaluar bloqueo de tarjeta.",
+  POL_DSP_FRAUD: "Riesgo de fraude: fraud_score ≥ 30 o sin puntaje. Evaluar bloqueo de tarjeta.",
   POL_STATUS: "Cuenta suspendida o cerrada.",
   POL_DSP_AMOUNT: "Monto mayor a USD 250: requiere revisión humana.",
   POL_REPEAT: "Cliente con reclamos repetidos.",
