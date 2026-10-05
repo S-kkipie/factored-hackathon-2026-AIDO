@@ -50,6 +50,11 @@ export function ChatProvider({ session: s, children }: { session: CustomerSessio
           lastAgentId.current = Math.max(lastAgentId.current, m.id);
           push({ who: "agent", text: m.text });
         }
+        // The agent closing the case ("resolve") returns the session to the assistant: stop polling and say so.
+        if ((await api.session(s.token)).status === "active") {
+          setHandoffId(null);
+          push({ who: "system", text: t.backToAssistant });
+        }
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) setExpired(true);
       }
@@ -57,7 +62,7 @@ export function ChatProvider({ session: s, children }: { session: CustomerSessio
     void tick();
     const timer = setInterval(tick, 3000);
     return () => clearInterval(timer);
-  }, [handoffId, s.token, push]);
+  }, [handoffId, s.token, push, t.backToAssistant]);
 
   const drive = useCallback(
     async (body: Parameters<typeof runAgent>[2]) => {

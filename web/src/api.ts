@@ -40,6 +40,8 @@ export const api = {
     request<LoginResult>("/api/auth/login", { method: "POST", body: JSON.stringify({ persona, pin, language }) }),
   agentLogin: (pin: string) => request<LoginResult>("/api/auth/agent", { method: "POST", body: JSON.stringify({ pin }) }),
   logout: (token: string) => request<{ ok: true }>("/api/auth/logout", { method: "POST" }, token),
+  session: (token: string) =>
+    request<{ sessionId: string; role: string; language: Language; status: "active" | "closed" | "handed_off"; expiresAt: number }>("/api/session", {}, token),
   agentMessages: (token: string, after: number) => request<ChatMessage[]>(`/api/chat/messages?after=${after}`, {}, token),
   queue: (token: string) => request<QueueItem[]>("/api/agent/queue", {}, token),
   sessionMessages: (token: string, sessionId: string) =>
