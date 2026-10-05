@@ -1,0 +1,5 @@
+# LF everywhere: frozen datasets are verified by sha256, so Windows checkouts must not rewrite line endings.
+* text=auto eol=lf
+*.png binary
+*.parquet binary
+*.sqlite binary

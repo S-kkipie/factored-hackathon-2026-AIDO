@@ -74,6 +74,9 @@ export async function* toAgui(input: RunInput, events: AsyncIterable<TurnEvent>)
           yield { type: EventType.TEXT_MESSAGE_END, messageId } as BaseEvent;
           break;
         }
+        case "view":
+          yield { type: EventType.STATE_DELTA, delta: [{ op: "add", path: "/view", value: e.view }] } as BaseEvent;
+          break;
         case "interrupt":
           interrupt = e;
           break;

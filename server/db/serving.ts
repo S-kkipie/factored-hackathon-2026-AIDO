@@ -72,8 +72,14 @@ export interface ServingDb {
   transaction(customerId: string, transactionId: string): Transaction | null;
   complaints(customerId: string): Complaint[];
   demoUsers(): { persona: string; customer_id: string }[];
+  /** Approved purchases with a USD amount in [from, to), grouped by category. */
+  spendingByCategory(customerId: string, from: string, to: string): { category: string; usd: number; count: number }[];
+  /** Approved purchases with a USD amount from `from` onwards, grouped by calendar month (YYYY-MM). */
+  spendingByMonth(customerId: string, from: string): { month: string; usd: number; count: number }[];
   close(): void;
 }
+
+const PURCHASES = "customer_id = ? and transaction_type = 'Purchase' and transaction_status = 'Approved' and amount_usd is not null";
 
 /** Case- and accent-insensitive form for merchant matching ("Café Ñandú" → "cafe nandu"). */
 export const foldText = (t: string): string => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -144,6 +150,22 @@ export function openServing(path: string): ServingDb {
         )
         .all(customerId),
     demoUsers: () => db.query<{ persona: string; customer_id: string }, []>("select persona, customer_id from demo_users").all(),
+    spendingByCategory: (customerId, from, to) =>
+      db
+        .query<{ category: string; usd: number; count: number }, [string, string, string]>(
+          `select coalesce(transaction_category, 'Other') as category, sum(amount_usd) as usd, count(*) as count
+           from transactions where ${PURCHASES} and transaction_date >= ? and transaction_date < ?
+           group by 1 order by usd desc`,
+        )
+        .all(customerId, from, to),
+    spendingByMonth: (customerId, from) =>
+      db
+        .query<{ month: string; usd: number; count: number }, [string, string]>(
+          `select substr(transaction_date, 1, 7) as month, sum(amount_usd) as usd, count(*) as count
+           from transactions where ${PURCHASES} and transaction_date >= ?
+           group by 1 order by 1`,
+        )
+        .all(customerId, from),
     close: () => db.close(),
   };
 }

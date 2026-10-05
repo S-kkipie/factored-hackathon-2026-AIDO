@@ -165,7 +165,7 @@ describe("agent console", () => {
 
     expect((await call(`/api/agent/sessions/${s.sessionId}/resume`, { method: "POST" }, a)).status).toBe(200);
     const after = await run(s.token, s.sessionId, say("hola"));
-    expect(after.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("LATAM Bank");
+    expect(after.events.find((e) => e.type === "TEXT_MESSAGE_CONTENT")?.delta).toContain("AIDO");
   });
 
   test("agent resume after the customer logged out does not revive a revoked token", async () => {
@@ -190,5 +190,50 @@ describe("agent console", () => {
     expect((await call("/api/agent/queue", {}, s.token)).status).toBe(403);
     expect((await call(`/api/trace/${o.sessionId}`, {}, s.token)).status).toBe(403);
     expect((await call(`/api/trace/${s.sessionId}`, {}, s.token)).status).toBe(200);
+  });
+});
+
+describe("customer home, cases and supervision", () => {
+  test("overview returns only the session customer's projected records", async () => {
+    const { login, call } = await setup();
+    const s = await login();
+    const res = await call("/api/me/overview", {}, s.token);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customer: { firstName: string }; products: unknown[]; recent: { transaction_id: string }[]; spending30d: { category: string }[] };
+    expect(body.customer.firstName).toBe("Ana");
+    expect(body.products.length).toBe(1);
+    expect(body.recent.map((t) => t.transaction_id)).not.toContain(FIXTURE.txOther);
+    expect(body.spending30d.map((c) => c.category)).toContain("Food");
+    const text = JSON.stringify(body);
+    for (const k of ["fraud_score", "customer_id", "last_name"]) expect(text).not.toContain(`"${k}"`);
+  });
+
+  test("cases list the customer's own dispute and nobody else's", async () => {
+    const { login, run, call } = await setup();
+    const s = await login();
+    const first = await run(s.token, s.sessionId, say("No reconozco un cargo de 45 dólares en Super Ahorro"));
+    const it = (first.events.at(-1)?.outcome as { interrupts: { id: string; metadata: { nonce: string } }[] }).interrupts[0]!;
+    await run(s.token, s.sessionId, { resume: [{ interruptId: it.id, status: "resolved", payload: { nonce: it.metadata.nonce, approved: true } }] });
+    const mine = (await (await call("/api/me/cases", {}, s.token)).json()) as { kind: string; status: string; transactionIds: string[] }[];
+    expect(mine).toEqual([expect.objectContaining({ kind: "dispute", status: "in_review", transactionIds: [FIXTURE.txSmall] })]);
+    const other = await login("repeat_complainer");
+    expect(await (await call("/api/me/cases", {}, other.token)).json()).toEqual([]);
+  });
+
+  test("metrics are agent-only and count outcomes from spans", async () => {
+    const { login, run, call, agent } = await setup();
+    const s = await login();
+    expect((await call("/api/ops/metrics", {}, s.token)).status).toBe(403);
+    await run(s.token, s.sessionId, say("Quiero hablar con una persona"));
+    const m = (await (await call("/api/ops/metrics", {}, await agent())).json()) as {
+      turns: number;
+      outcomes: Record<string, number>;
+      escalationsByRule: { ruleId: string }[];
+      queue: { queued: number };
+    };
+    expect(m.turns).toBe(1);
+    expect(m.outcomes.handoff).toBe(1);
+    expect(m.queue.queued).toBe(1);
+    expect(m.escalationsByRule.map((r) => r.ruleId)).toContain("POL_HUMAN");
   });
 });
