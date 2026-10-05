@@ -12,7 +12,7 @@ export function LoginPage() {
   const [personas, setPersonas] = useState<string[]>([]);
   const [persona, setPersona] = useState("normal");
   const [language, setLanguage] = useState<Language>("es");
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState("2468");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const t = strings[language];

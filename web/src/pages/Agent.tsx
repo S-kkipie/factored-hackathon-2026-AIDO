@@ -21,7 +21,7 @@ const PRIORITY_LABEL: Record<Priority, string> = { alta: "Prioridad alta", media
 /** Handoff queue and case view. Card strings are rendered as text only, never as HTML. */
 export function AgentPage() {
   const [agent, setAgent] = useState<AgentSession | null>(() => session.agent());
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState("1357");
   const [error, setError] = useState<string | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
