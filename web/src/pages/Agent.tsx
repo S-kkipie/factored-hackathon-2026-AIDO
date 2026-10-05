@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, type ChatMessage, type QueueItem, api } from "../api";
 import { Avatar, Wordmark } from "../components/Brand";
-import { ConsoleRail } from "../components/ConsoleRail";
+import { ConsoleMobileNav, ConsoleRail } from "../components/ConsoleRail";
 import { ago } from "../format";
 import { PRIORITY_RANK, type Priority, RULE_TEXT, priorityOf } from "../rules";
 import { type AgentSession, session } from "../session";
@@ -187,23 +187,30 @@ export function AgentPage() {
     }
   };
 
+  const stats = (
+    <div className="rail-stats">
+      <div>
+        <span className="stat-num">{waiting}</span>
+        <span className="muted small">en espera</span>
+      </div>
+      <div>
+        <span className="stat-num">{queue.filter((q) => q.takenBy === agent.sessionId).length}</span>
+        <span className="muted small">míos</span>
+      </div>
+      <div>
+        <span className="stat-num danger">{queue.filter((q) => priorityOf(q.ruleIds) === "alta").length}</span>
+        <span className="muted small">alta</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="console">
+    <div className={`console${item ? " has-case" : ""}`}>
+      <ConsoleMobileNav agent={agent} onLogout={() => setAgent(null)}>
+        {stats}
+      </ConsoleMobileNav>
       <ConsoleRail agent={agent} onLogout={() => setAgent(null)}>
-        <div className="rail-stats">
-          <div>
-            <span className="stat-num">{waiting}</span>
-            <span className="muted small">en espera</span>
-          </div>
-          <div>
-            <span className="stat-num">{queue.filter((q) => q.takenBy === agent.sessionId).length}</span>
-            <span className="muted small">míos</span>
-          </div>
-          <div>
-            <span className="stat-num danger">{queue.filter((q) => priorityOf(q.ruleIds) === "alta").length}</span>
-            <span className="muted small">alta</span>
-          </div>
-        </div>
+        {stats}
       </ConsoleRail>
 
       <section className="queue-col" aria-label="Cola de casos">
@@ -258,6 +265,9 @@ export function AgentPage() {
           </div>
         ) : (
           <>
+            <button type="button" className="mobile-back" onClick={() => setSelected(null)}>
+              ← Casos
+            </button>
             <header className="case-head">
               <div>
                 <div className="row">

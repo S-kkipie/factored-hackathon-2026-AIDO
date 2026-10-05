@@ -3,7 +3,41 @@ import type { ReactNode } from "react";
 import { api } from "../api";
 import { type AgentSession, session } from "../session";
 import { Guilloche, Wordmark } from "./Brand";
+import { MobileTabs, MobileTopBar } from "./MobileNav";
 import { ThemeToggle } from "./ThemeToggle";
+
+const CASES_ICON = <path d="M4 5h16v11H8l-4 4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />;
+const SUPERVISION_ICON = <path d="M4 20V10m6 10V4m6 16v-7m4 7H3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />;
+
+/** Phone/tablet navigation for the console: top bar with theme and logout, bottom tabs for Cases and Supervision. */
+export function ConsoleMobileNav({ agent, onLogout, children }: { agent: AgentSession; onLogout: () => void; children?: ReactNode }) {
+  return (
+    <>
+      <MobileTopBar sub="Equipo AIDO">
+        {children}
+        <ThemeToggle />
+        <button
+          type="button"
+          className="ghost full"
+          onClick={async () => {
+            await api.logout(agent.token).catch(() => {});
+            session.setAgent(null);
+            onLogout();
+          }}
+        >
+          Cerrar sesión
+        </button>
+      </MobileTopBar>
+      <MobileTabs
+        label="Consola"
+        tabs={[
+          { to: "/agent", label: "Casos", icon: CASES_ICON },
+          { to: "/supervision", label: "Supervisión", icon: SUPERVISION_ICON },
+        ]}
+      />
+    </>
+  );
+}
 
 /** Left rail shared by the agent console and the supervision dashboard. */
 export function ConsoleRail({ agent, onLogout, children }: { agent: AgentSession; onLogout: () => void; children?: ReactNode }) {

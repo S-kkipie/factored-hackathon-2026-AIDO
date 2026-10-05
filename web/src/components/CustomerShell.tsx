@@ -5,6 +5,7 @@ import { ChatProvider, useChat } from "../chat";
 import { strings } from "../i18n";
 import { type CustomerSession, session } from "../session";
 import { Guilloche, Wordmark } from "./Brand";
+import { MobileTabs, MobileTopBar } from "./MobileNav";
 import { ThemeToggle } from "./ThemeToggle";
 
 const ICONS = {
@@ -83,6 +84,40 @@ function Foot({ s }: { s: CustomerSession }) {
   );
 }
 
+/** Phone layout: top bar with a menu (quick topics, account, theme, logout) and bottom tabs for the sections. */
+function MobileNav({ s }: { s: CustomerSession }) {
+  const t = strings[s.language];
+  const chat = useChat();
+  const navigate = useNavigate();
+  const ask = async (q: string) => {
+    await navigate({ to: "/chat" });
+    void chat.send(q);
+  };
+  return (
+    <>
+      <MobileTopBar sub={t.brandTagline}>
+        <section className="side-section">
+          <h3>{t.quickTopics}</h3>
+          {t.suggestions.map((q) => (
+            <button key={q} type="button" className="side-topic" onClick={() => void ask(q)} disabled={chat.busy || chat.expired}>
+              {q}
+            </button>
+          ))}
+        </section>
+        <Foot s={s} />
+      </MobileTopBar>
+      <MobileTabs
+        label={t.navLabel}
+        tabs={[
+          { to: "/inicio", label: t.navHome, icon: ICONS.home },
+          { to: "/chat", label: t.assistantNav, icon: ICONS.chat, badge: chat.pending !== null },
+          { to: "/casos", label: t.navCases, icon: ICONS.cases },
+        ]}
+      />
+    </>
+  );
+}
+
 /** Customer layout: navigation + the shared conversation, so switching sections never drops the chat. */
 export function CustomerShell() {
   const [s] = useState(() => session.customer());
@@ -95,6 +130,7 @@ export function CustomerShell() {
           <Nav s={s} />
           <Foot s={s} />
         </div>
+        <MobileNav s={s} />
         <Outlet />
       </div>
     </ChatProvider>

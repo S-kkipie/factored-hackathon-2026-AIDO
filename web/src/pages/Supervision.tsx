@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ApiError, type OpsMetrics, type OutcomeKind, api } from "../api";
 import { BarList, Columns, Kpi } from "../components/Charts";
-import { ConsoleRail } from "../components/ConsoleRail";
+import { ConsoleMobileNav, ConsoleRail } from "../components/ConsoleRail";
 import { RULE_TEXT } from "../rules";
 import { type AgentSession, session } from "../session";
 
@@ -85,6 +85,7 @@ export function SupervisionPage() {
   return (
     <div className="console supervision">
       <ConsoleRail agent={agent} onLogout={() => setAgent(null)} />
+      <ConsoleMobileNav agent={agent} onLogout={() => setAgent(null)} />
       <main className="page wide">
         <header className="page-head">
           <div>
