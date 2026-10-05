@@ -46,7 +46,7 @@ You need:
 ```bash
 git clone https://github.com/S-kkipie/factored-hackathon-2026-AIDO.git aido && cd aido
 bun install
-bun run typecheck && bun test        # expect all tests to pass (456 at da1bbb7); no network or paid calls
+bun run typecheck && bun test        # expect all tests to pass (443 at 2d92277); no network or paid calls
 ```
 
 ## Step 2: Get `data/serving.sqlite` (required by the image build)

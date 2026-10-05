@@ -139,6 +139,14 @@ the current short git SHA), `--data-dir` (defaults to the real path of `./data`)
 `--service-account` (defaults to `aido-runtime@P.iam.gserviceaccount.com`, the
 dedicated runtime SA created in step 2).
 
+If the deploy ends with `Setting IAM policy failed` and adding `allUsers` returns
+`do not belong to a permitted customer`, the project's organization enforces Domain
+Restricted Sharing. Make the service public without an `allUsers` binding:
+
+```bash
+gcloud run services update aido --region R --project P --no-invoker-iam-check
+```
+
 ## 4. Verify
 
 After the Cloud Run deploy finishes, `gcloud run deploy` prints the service URL
