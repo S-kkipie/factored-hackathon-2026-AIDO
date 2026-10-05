@@ -191,9 +191,14 @@ Single process, as deployed: `bun run build:web && bun run start` serves the web
 | Page | Purpose |
 |---|---|
 | `/login` | Pick a demo persona and the language (Spanish or Portuguese) |
-| `/chat` | Customer chat over AG-UI: live step status, router confidence, rule ids; disputes are confirmed only with the confirm card (nonce-bound), and the case id is shown on success; handoffs show a banner and the human agent's replies |
+| `/inicio` | Customer home: accounts, recent movements, 30-day spending by category and monthly totals |
+| `/chat` | Chat with Aida over AG-UI: products and movements rendered as cards from the turn's structured view; disputes are confirmed only with the confirm card (nonce-bound), and the case id is shown on success; handoffs show a banner and the human agent's replies |
+| `/casos` | The customer's own disputes and handoffs with their status |
 | `/agent` | Agent console: handoff queue, structured handoff card with rule explanations, take / reply / close and hand back to the assistant |
+| `/supervision` | Agent-only dashboard: automated resolution rate, outcomes, latency, LLM cost, escalations by rule, intents and security signals (aggregates only, no message text) |
 | `/trace/:session` | Per-turn timeline: graph nodes, router label and confidence, policy decision, rule ids, latency, LLM tokens and cost (no message content) |
+
+The UI is light by default; dark mode is opt-in from the sidebar and remembered per browser.
 
 | Persona | What it exercises |
 |---|---|
@@ -216,6 +221,9 @@ Single process, as deployed: `bun run build:web && bun run start` serves the web
 | `POST /api/auth/logout` | Ends the caller's own session; its token stops verifying immediately |
 | `POST /api/agui/run` | AG-UI `RunAgentInput` → SSE events; `threadId` must be the session id |
 | `GET /api/chat/messages` | Agent replies for a handed-off customer |
+| `GET /api/me/overview` | The session customer's accounts, recent movements and spending summaries (projected fields only) |
+| `GET /api/me/cases` | The session customer's own disputes and handoffs |
+| `GET /api/ops/metrics?hours=` | Supervision aggregates for the last `hours` (agent only) |
 | `POST /api/auth/agent` | Agent login |
 | `GET /api/agent/queue`, `POST /api/agent/sessions/:id/{take,reply,resume}` | Agent console |
 | `GET /api/agent/sessions/:id/messages` | Full message history for a session (agent only) |

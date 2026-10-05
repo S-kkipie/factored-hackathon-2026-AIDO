@@ -54,8 +54,8 @@ const reasonWord = (reason: DisputeReason | undefined, lang: Language): string =
 
 const TEXT: Record<TemplateId, Record<Language, (p: Params) => string>> = {
   greeting: {
-    es: () => "Hola, soy el asistente de LATAM Bank. Puedo consultar saldos y movimientos, explicar cargos y registrar disputas.",
-    pt: () => "Olá, sou o assistente do LATAM Bank. Posso consultar saldos e movimentações, explicar cobranças e registrar contestações.",
+    es: () => "Hola, soy Aida, la asistente de AIDO. Puedo consultar saldos y movimientos, explicar cargos y registrar disputas.",
+    pt: () => "Olá, sou a Aida, assistente do AIDO. Posso consultar saldos e movimentações, explicar cobranças e registrar contestações.",
   },
   clarify_intent: {
     es: () => "¿Me cuenta un poco más? Puedo ayudarle con su saldo, sus movimientos, explicar un cargo o disputar un cargo que no reconoce.",
